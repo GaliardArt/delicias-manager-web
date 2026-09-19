@@ -1,0 +1,55 @@
+rules_version = '2';
+
+// Regras de segurança do Delícias Manager.
+// O sistema pertence a uma única empresa: qualquer usuário autenticado
+// no projeto Firebase tem acesso de leitura/escrita aos dados internos,
+// mas usuários não autenticados nunca têm acesso.
+//
+// Se no futuro o sistema precisar suportar múltiplas empresas/tenants,
+// isso exige uma mudança de arquitetura (ver seção 31 da especificação
+// original: deve ser discutido e aprovado antes de implementar).
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    match /customers/{customerId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /products/{productId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /sales/{saleId} {
+      allow read, write: if isSignedIn();
+
+      match /payments/{paymentId} {
+        allow read, write: if isSignedIn();
+      }
+    }
+
+    match /orders/{orderId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /salesDays/{salesDayId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /activityHistory/{eventId} {
+      // Histórico de auditoria: pode ser criado por qualquer usuário autenticado,
+      // mas nunca alterado ou apagado (trilha de auditoria confiável).
+      allow read, create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
+    // Qualquer coleção não listada explicitamente é negada por padrão.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
