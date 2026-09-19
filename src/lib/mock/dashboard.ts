@@ -20,6 +20,7 @@ export const mockDashboard: DashboardSummary = {
       orderDate: "2026-09-18",
       expectedDate: "2026-09-20",
       status: "confirmada",
+      payments: [],
       deliveryAddress: "Rua das Flores, 120",
     },
     {
@@ -33,6 +34,7 @@ export const mockDashboard: DashboardSummary = {
       orderDate: "2026-09-17",
       expectedDate: "2026-09-21",
       status: "em_producao",
+      payments: [],
       deliveryAddress: "Av. Central, 45",
     },
     {
@@ -46,6 +48,7 @@ export const mockDashboard: DashboardSummary = {
       orderDate: "2026-09-16",
       expectedDate: "2026-09-20",
       status: "pronta",
+      payments: [],
       deliveryAddress: "Rua dos Ipês, 78",
     },
   ],

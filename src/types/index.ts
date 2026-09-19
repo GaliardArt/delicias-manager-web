@@ -76,6 +76,7 @@ export interface Order {
   totalCents: number;
   paidCents: number;
   pendingCents: number;
+  payments: Payment[];
   orderDate: string;
   expectedDate: string;
   salesDayId?: string;

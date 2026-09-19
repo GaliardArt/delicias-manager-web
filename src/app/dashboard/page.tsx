@@ -4,7 +4,6 @@ import {
   Clock,
   HandCoins,
   ArrowRight,
-  CalendarDays,
   ShoppingCart,
   CreditCard,
   PackagePlus,
@@ -160,12 +159,16 @@ export default function DashboardPage() {
 
       {/* Ações rápidas — mobile-first, ficam acessíveis com uma mão */}
       <div className="mt-5 grid grid-cols-2 gap-3 md:hidden">
-        <Button size="lg" className="w-full">
-          <CalendarDays className="h-4 w-4" /> Nova venda
-        </Button>
-        <Button variant="secondary" size="lg" className="w-full">
-          <PackagePlus className="h-4 w-4" /> Nova encomenda
-        </Button>
+        <Link href="/vendas/nova" className="w-full">
+          <Button size="lg" className="w-full">
+            <ShoppingCart className="h-4 w-4" /> Nova venda
+          </Button>
+        </Link>
+        <Link href="/encomendas/nova" className="w-full">
+          <Button variant="secondary" size="lg" className="w-full">
+            <PackagePlus className="h-4 w-4" /> Nova encomenda
+          </Button>
+        </Link>
       </div>
     </AppShell>
   );
