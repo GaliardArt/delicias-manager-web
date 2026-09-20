@@ -30,6 +30,8 @@ import {
   summarizePendingCustomers,
   findInactiveCustomers,
   computeTrends,
+  computeMonthlyEvolution,
+  computeCustomerBehavior,
   buildWhatsAppSummary,
   RawSale,
   PeriodKey,
@@ -103,6 +105,14 @@ export default function RelatoriosPage() {
     [sales, customers]
   );
   const trends = useMemo(() => computeTrends(current, previous), [current, previous]);
+  const monthlyEvolution = useMemo(
+    () => (sales ? computeMonthlyEvolution(sales) : []),
+    [sales]
+  );
+  const customerBehavior = useMemo(
+    () => (sales ? computeCustomerBehavior(sales, period) : { newCustomers: 0, returningCustomers: 0 }),
+    [sales, period]
+  );
 
   const whatsappText = useMemo(
     () => buildWhatsAppSummary(period, salesSummary, productsSummary.topSelling),
@@ -402,6 +412,58 @@ export default function RelatoriosPage() {
                 )}
               </div>
             )}
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Insights</CardTitle>
+            </CardHeader>
+            <div className="flex flex-col gap-4">
+              <div className="flex gap-6 text-sm">
+                <div>
+                  <p className="text-xs text-ink-muted">Clientes novos no período</p>
+                  <p className="font-display text-base font-semibold text-ink">
+                    {customerBehavior.newCustomers}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-ink-muted">Clientes recorrentes</p>
+                  <p className="font-display text-base font-semibold text-ink">
+                    {customerBehavior.returningCustomers}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-xs text-ink-muted">Evolução (últimos 6 meses)</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="text-xs text-ink-muted">
+                        <th className="pb-1.5 pr-3 font-medium">Mês</th>
+                        <th className="pb-1.5 pr-3 font-medium">Faturamento</th>
+                        <th className="pb-1.5 pr-3 font-medium">Ticket médio</th>
+                        <th className="pb-1.5 font-medium">Vendas</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {monthlyEvolution.map((m) => (
+                        <tr key={m.label} className="border-t border-line">
+                          <td className="py-1.5 pr-3 capitalize text-ink">{m.label}</td>
+                          <td className="py-1.5 pr-3 text-ink">
+                            {formatCurrencyBRL(m.faturamentoCents)}
+                          </td>
+                          <td className="py-1.5 pr-3 text-ink-muted">
+                            {formatCurrencyBRL(m.ticketMedioCents)}
+                          </td>
+                          <td className="py-1.5 text-ink-muted">{m.quantidadeVendas}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           </Card>
         </div>
       )}

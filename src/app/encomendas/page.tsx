@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, PackageSearch, Search } from "lucide-react";
+import { Plus, PackageSearch, Search, MessageCircle, History } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -10,7 +10,12 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Badge";
-import { listRecentOrders, OrderListItem } from "@/lib/firebase/orders";
+import {
+  listRecentOrders,
+  isOrderCompleted,
+  buildProductionWhatsAppText,
+  OrderListItem,
+} from "@/lib/firebase/orders";
 import { formatCurrencyBRL, formatDateBR } from "@/lib/utils/format";
 import { orderStatusLabel, orderStatusTone } from "@/lib/utils/order-status";
 import { OrderStatus } from "@/types";
@@ -47,11 +52,20 @@ export default function EncomendasPage() {
   }, []);
 
   const term = search.toLowerCase();
-  const filtered = orders?.filter(
+  // Encomendas pagas + entregues saem da lista principal (vão para o histórico),
+  // para não confundir com pedidos em aberto.
+  const active = orders?.filter((o) => !isOrderCompleted(o));
+  const filtered = active?.filter(
     (o) =>
       o.customerName.toLowerCase().includes(term) &&
       (statusFilter === "todas" || o.status === statusFilter)
   );
+
+  function handleShareProduction() {
+    if (!active) return;
+    const text = buildProductionWhatsAppText(active);
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+  }
 
   return (
     <AppShell title="Encomendas">
@@ -78,10 +92,24 @@ export default function EncomendasPage() {
             ))}
           </Select>
         </div>
-        <Link href="/encomendas/nova" className="w-full md:w-auto">
-          <Button size="lg" className="w-full md:w-auto">
-            <Plus className="h-4 w-4" /> Nova encomenda
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={handleShareProduction} disabled={!active}>
+            <MessageCircle className="h-4 w-4" /> Produção
           </Button>
+          <Link href="/encomendas/nova" className="w-full md:w-auto">
+            <Button size="lg" className="w-full md:w-auto">
+              <Plus className="h-4 w-4" /> Nova
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      <div className="mb-4">
+        <Link
+          href="/encomendas/historico"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted hover:text-ink"
+        >
+          <History className="h-3.5 w-3.5" /> Ver histórico (pagas e entregues)
         </Link>
       </div>
 
@@ -106,11 +134,15 @@ export default function EncomendasPage() {
       {orders !== null && !error && filtered?.length === 0 && (
         <EmptyState
           icon={PackageSearch}
-          title={search || statusFilter !== "todas" ? "Nenhuma encomenda encontrada" : "Nenhuma encomenda registrada ainda"}
+          title={
+            search || statusFilter !== "todas"
+              ? "Nenhuma encomenda encontrada"
+              : "Nenhuma encomenda em aberto"
+          }
           description={
             search || statusFilter !== "todas"
               ? "Tente ajustar a busca ou o filtro de status."
-              : "Registre a primeira encomenda para começar a organizar as entregas."
+              : "Registre uma nova encomenda, ou confira o histórico das já concluídas."
           }
           actionLabel={search || statusFilter !== "todas" ? undefined : "+ Nova encomenda"}
           onAction={

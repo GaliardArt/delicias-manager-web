@@ -9,6 +9,7 @@ import { Select } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Checkbox } from "@/components/ui/Checkbox";
 import { Customer, PaymentMethod, Product, SaleItem } from "@/types";
 import { listActiveCustomers } from "@/lib/firebase/customers";
 import { listActiveProducts } from "@/lib/firebase/products";
@@ -25,6 +26,8 @@ export function SaleForm() {
   const [loadError, setLoadError] = useState(false);
 
   const [customerId, setCustomerId] = useState("");
+  const [avulso, setAvulso] = useState(false);
+  const [avulsoName, setAvulsoName] = useState("");
   const [items, setItems] = useState<SaleItem[]>([]);
 
   const [pendingProductId, setPendingProductId] = useState("");
@@ -91,12 +94,13 @@ export function SaleForm() {
 
   const pendingCents = totalCents - paidCents;
   const selectedCustomer = customers?.find((c) => c.id === customerId);
+  const effectiveCustomerName = avulso ? avulsoName.trim() || "Cliente avulso" : selectedCustomer?.name;
 
   async function handleSubmit() {
     setFormError(null);
 
-    if (!selectedCustomer) {
-      setFormError("Selecione um cliente.");
+    if (!avulso && !selectedCustomer) {
+      setFormError("Selecione um cliente ou marque \"Avulso\".");
       return;
     }
     if (items.length === 0) {
@@ -111,8 +115,8 @@ export function SaleForm() {
     setSubmitting(true);
     try {
       const saleId = await createSale({
-        customerId: selectedCustomer.id,
-        customerName: selectedCustomer.name,
+        customerId: avulso ? "" : selectedCustomer!.id,
+        customerName: effectiveCustomerName!,
         items,
         totalCents,
         initialPaymentCents: paidCents,
@@ -151,22 +155,14 @@ export function SaleForm() {
     );
   }
 
-  if (customers.length === 0 || products.length === 0) {
+  if (products.length === 0) {
     return (
       <EmptyState
         icon={Users}
-        title="Cadastre clientes e produtos primeiro"
-        description={
-          customers.length === 0 && products.length === 0
-            ? "Ainda não há clientes nem produtos ativos cadastrados."
-            : customers.length === 0
-            ? "Ainda não há clientes ativos cadastrados."
-            : "Ainda não há produtos ativos cadastrados."
-        }
-        actionLabel={customers.length === 0 ? "+ Novo cliente" : "+ Novo produto"}
-        onAction={() =>
-          (window.location.href = customers.length === 0 ? "/clientes" : "/produtos")
-        }
+        title="Cadastre produtos primeiro"
+        description="Ainda não há produtos ativos cadastrados."
+        actionLabel="+ Novo produto"
+        onAction={() => (window.location.href = "/produtos")}
       />
     );
   }
@@ -177,14 +173,31 @@ export function SaleForm() {
         <CardHeader>
           <CardTitle>Cliente</CardTitle>
         </CardHeader>
-        <Select value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-          <option value="">Selecione um cliente</option>
-          {customers.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </Select>
+        <div className="flex flex-col gap-3">
+          <Checkbox
+            id="avulso"
+            label="Avulso (para clientes não cadastrados)"
+            checked={avulso}
+            onChange={(e) => setAvulso(e.target.checked)}
+          />
+          {avulso ? (
+            <Input
+              label="Nome (opcional)"
+              value={avulsoName}
+              onChange={(e) => setAvulsoName(e.target.value)}
+              placeholder="Cliente avulso"
+            />
+          ) : (
+            <Select value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
+              <option value="">Selecione um cliente</option>
+              {customers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </Select>
+          )}
+        </div>
       </Card>
 
       <Card>
@@ -317,7 +330,7 @@ export function SaleForm() {
           className="w-full"
           onClick={handleSubmit}
           loading={submitting}
-          disabled={items.length === 0 || !customerId}
+          disabled={items.length === 0 || (!avulso && !customerId)}
         >
           Registrar venda · {formatCurrencyBRL(totalCents)}
         </Button>

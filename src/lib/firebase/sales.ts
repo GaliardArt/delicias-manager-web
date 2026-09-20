@@ -30,6 +30,7 @@ interface CreateSaleInput {
 
 // Cria a venda e, se houver valor pago no ato, o primeiro pagamento — tudo em
 // um único batch atômico, para nunca deixar uma venda "pela metade" (seção 21).
+// customerId pode vir vazio para vendas avulsas (cliente não cadastrado).
 export async function createSale(input: CreateSaleInput): Promise<string> {
   const { customerId, customerName, items, totalCents, initialPaymentCents, initialPaymentMethod } =
     input;

@@ -117,6 +117,13 @@ export interface OrderListItem {
   expectedDate: string;
   status: OrderStatus;
   itemsCount: number;
+  items: SaleItem[];
+}
+
+// Uma encomenda "concluída" (paga + entregue) sai da lista principal para não
+// confundir com pedidos em aberto — vai para /encomendas/historico.
+export function isOrderCompleted(order: Pick<OrderListItem, "status" | "pendingCents">): boolean {
+  return order.status === "entregue" && order.pendingCents <= 0;
 }
 
 export async function listRecentOrders(max = 150): Promise<OrderListItem[]> {
@@ -133,6 +140,7 @@ export async function listRecentOrders(max = 150): Promise<OrderListItem[]> {
       expectedDate: data.expectedDate,
       status: data.status,
       itemsCount: Array.isArray(data.items) ? data.items.length : 0,
+      items: data.items ?? [],
     };
   });
 }
@@ -234,4 +242,39 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus): P
   if (status === "cancelada") {
     await logActivity("pedido_cancelado", "Encomenda cancelada", orderId);
   }
+}
+
+// Resumo de produção para o WhatsApp (seção 17): cliente + produtos a produzir,
+// agrupado por data prevista de entrega. Só entram encomendas ainda em aberto
+// (não canceladas, não concluídas) — a lista é para quem vai produzir, não um
+// relatório financeiro.
+export function buildProductionWhatsAppText(orders: OrderListItem[]): string {
+  const relevant = orders
+    .filter((o) => o.status !== "cancelada" && !isOrderCompleted(o))
+    .sort((a, b) => a.expectedDate.localeCompare(b.expectedDate));
+
+  const lines = [`📦 *Produção pendente*`];
+
+  if (relevant.length === 0) {
+    lines.push(``, `Nenhuma encomenda em aberto no momento.`);
+    return lines.join("\n");
+  }
+
+  let lastDate = "";
+  for (const order of relevant) {
+    if (order.expectedDate !== lastDate) {
+      lastDate = order.expectedDate;
+      const label = new Date(order.expectedDate + "T00:00:00").toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+      });
+      lines.push(``, `📅 *${label}*`);
+    }
+    lines.push(`👤 ${order.customerName}`);
+    for (const item of order.items) {
+      lines.push(`   • ${item.quantity}x ${item.productName}`);
+    }
+  }
+
+  return lines.join("\n");
 }

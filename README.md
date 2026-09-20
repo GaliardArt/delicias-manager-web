@@ -194,9 +194,47 @@ Corrigido dos dois lados:
   em vez de só a mensagem genérica "Verifique sua conexão ou as credenciais do
   Firebase"
 
-## Próximos passos (conforme seção 30 da especificação)
+## Ajustes pós-lançamento
 
-- **Fase 8** — Insights e tendências (aprofundar o que a Fase 7 já começou)
+- **Venda avulsa**: checkbox "Avulso (para clientes não cadastrados)" na tela de
+  Nova Venda — quando marcado, dispensa a seleção de cliente cadastrado e permite
+  digitar um nome livre (ou deixar em branco, que vira "Cliente avulso"). Vendas
+  avulsas gravam `customerId` vazio e por isso **não entram** nos rankings "Clientes
+  que mais compraram", "Valores pendentes" nem no cálculo de "Clientes novos vs.
+  recorrentes" (Fase 8) — não fazem sentido ali, já que não há um cadastro para
+  atribuir fidelidade ou cobrança. Ainda contam normalmente no faturamento e nos
+  relatórios de produtos.
+- **Histórico de encomendas**: encomendas com status "Entregue" **e** já totalmente
+  pagas somem da lista principal de `/encomendas` automaticamente e passam a viver
+  em `/encomendas/historico`, para não misturar pedido antigo já resolvido com
+  pedido em aberto. A regra é `isOrderCompleted` em `src/lib/firebase/orders.ts` —
+  puramente derivada do status + saldo, não é um campo próprio para manter
+  sincronizado.
+- **Login sempre exigido**: o hook `useAuth` já existia desde a Fase 1 mas nunca
+  tinha sido usado em lugar nenhum — não havia nenhuma proteção de rota. Agora o
+  `AppShell` verifica a sessão e redireciona para `/login` sempre que não há usuário
+  autenticado (inclusive logo depois de um logout). O botão "Sair" da sidebar também
+  não navegava para lugar nenhum depois de deslogar — corrigido. A tela de login
+  também redireciona sozinha para o Dashboard se a pessoa já estiver logada.
+- **Produção pelo WhatsApp**: botão "Produção" em `/encomendas` monta uma lista de
+  cliente + produtos a produzir (agrupada por data de entrega), a partir de todas as
+  encomendas em aberto — não é um relatório financeiro, é uma lista de tarefas para
+  quem vai produzir. Usa o mesmo mecanismo padrão `wa.me` da Fase 7.
 
-Seguindo a regra da seção 31: mudanças que afetem banco de dados, arquitetura, fluxo de
-vendas/pagamentos ou autenticação serão sempre discutidas antes da implementação.
+### Fase 8 — Insights
+- Card "Insights" na tela de Relatórios, abaixo de Tendências:
+  - **Clientes novos vs. recorrentes** no período selecionado
+  - **Evolução dos últimos 6 meses** (faturamento, ticket médio, quantidade de
+    vendas) em formato de tabela simples — meses sem venda aparecem com zero, não
+    são omitidos
+- Deliberadamente sem gráficos: a seção 3 da spec pede para evitar "gráficos
+  desnecessários" numa interface limpa, então os insights ficam em números e texto
+  direto, no mesmo espírito do resto do sistema
+
+## Roadmap
+
+As 8 fases da seção 30 da especificação original estão todas implementadas. Dali
+para frente, qualquer evolução (novos relatórios, exportações, permissões por
+usuário etc.) é conversa nova — pela regra da seção 31, mudanças que afetem banco de
+dados, arquitetura, fluxo de vendas/pagamentos ou autenticação são sempre discutidas
+antes da implementação.

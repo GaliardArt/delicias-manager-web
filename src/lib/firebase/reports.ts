@@ -147,6 +147,7 @@ export interface CustomerRanking {
 export function summarizeTopCustomers(sales: RawSale[]): CustomerRanking[] {
   const map = new Map<string, CustomerRanking>();
   for (const sale of sales) {
+    if (!sale.customerId) continue; // venda avulsa — não é um cliente cadastrado para ranquear
     const entry = map.get(sale.customerId) ?? {
       name: sale.customerName,
       totalCents: 0,
@@ -165,6 +166,7 @@ export function summarizeTopCustomers(sales: RawSale[]): CustomerRanking[] {
 export function summarizePendingCustomers(allSales: RawSale[]): CustomerRanking[] {
   const map = new Map<string, CustomerRanking>();
   for (const sale of allSales) {
+    if (!sale.customerId) continue; // venda avulsa — sem cadastro para cobrar depois
     if (sale.pendingCents <= 0) continue;
     const entry = map.get(sale.customerId) ?? {
       name: sale.customerName,
@@ -275,6 +277,74 @@ export function computeTrends(current: RawSale[], previous: RawSale[]): Trends {
     growingProducts: deltas.filter((d) => d.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, 3),
     decliningProducts: deltas.filter((d) => d.delta < 0).sort((a, b) => a.delta - b.delta).slice(0, 3),
   };
+}
+
+export interface MonthlyEvolution {
+  label: string;
+  faturamentoCents: number;
+  ticketMedioCents: number;
+  quantidadeVendas: number;
+}
+
+// Evolução dos últimos `monthsBack` meses (seção 16: "evolução do ticket médio",
+// seção 30 Fase 8: "tendências"). Meses sem nenhuma venda aparecem com zero —
+// dado real, não omitido.
+export function computeMonthlyEvolution(allSales: RawSale[], monthsBack = 6): MonthlyEvolution[] {
+  const months: MonthlyEvolution[] = [];
+  const now = new Date();
+
+  for (let i = monthsBack - 1; i >= 0; i--) {
+    const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+    const inMonth = allSales.filter((s) => s.createdAt >= monthStart && s.createdAt < monthEnd);
+    const summary = summarizeSales(inMonth);
+    months.push({
+      label: monthStart.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }),
+      faturamentoCents: summary.faturamentoCents,
+      ticketMedioCents: summary.ticketMedioCents,
+      quantidadeVendas: summary.quantidadeVendas,
+    });
+  }
+
+  return months;
+}
+
+export interface CustomerBehavior {
+  newCustomers: number;
+  returningCustomers: number;
+}
+
+// Comportamento de clientes no período (seção 30 Fase 8): quantos são novos
+// (primeira compra de todos os tempos caiu dentro do período) vs recorrentes
+// (já tinham comprado antes e voltaram a comprar no período).
+export function computeCustomerBehavior(allSales: RawSale[], period: Period): CustomerBehavior {
+  const registeredSales = allSales.filter((s) => s.customerId); // exclui vendas avulsas
+  const firstPurchase = new Map<string, Date>();
+  for (const sale of registeredSales) {
+    const current = firstPurchase.get(sale.customerId);
+    if (!current || sale.createdAt < current) {
+      firstPurchase.set(sale.customerId, sale.createdAt);
+    }
+  }
+
+  const customersInPeriod = new Set(
+    registeredSales
+      .filter((s) => s.createdAt >= period.start && s.createdAt < period.end)
+      .map((s) => s.customerId)
+  );
+
+  let newCustomers = 0;
+  let returningCustomers = 0;
+  for (const customerId of customersInPeriod) {
+    const first = firstPurchase.get(customerId);
+    if (first && first >= period.start && first < period.end) {
+      newCustomers += 1;
+    } else {
+      returningCustomers += 1;
+    }
+  }
+
+  return { newCustomers, returningCustomers };
 }
 
 export function buildWhatsAppSummary(
