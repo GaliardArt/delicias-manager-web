@@ -36,7 +36,8 @@ export default function OrderDetailPage() {
     setOrder(undefined);
     try {
       setOrder(await getOrderWithPayments(params.id));
-    } catch {
+    } catch (err) {
+      console.error(err);
       setError(true);
     }
   }

@@ -36,6 +36,7 @@ export function AddOrderPaymentForm({ orderId, maxCents, onSuccess }: AddOrderPa
       await addOrderPayment(orderId, amountCents, method);
       onSuccess();
     } catch (err) {
+      console.error(err);
       setError(
         err instanceof Error
           ? err.message

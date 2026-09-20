@@ -20,7 +20,8 @@ export default function LoginPage() {
     try {
       await signIn(email, password);
       router.push("/dashboard");
-    } catch {
+    } catch (err) {
+      console.error(err);
       setError("E-mail ou senha incorretos. Tente novamente.");
     } finally {
       setLoading(false);

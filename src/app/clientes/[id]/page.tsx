@@ -35,7 +35,8 @@ export default function CustomerDetailPage() {
       ]);
       setCustomer(c);
       setStats(s);
-    } catch {
+    } catch (err) {
+      console.error(err);
       setError(true);
     }
   }

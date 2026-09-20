@@ -44,7 +44,10 @@ export function SaleForm() {
         setCustomers(c);
         setProducts(p);
       })
-      .catch(() => setLoadError(true));
+      .catch((err) => {
+        console.error(err);
+        setLoadError(true);
+      });
   }, []);
 
   const totalCents = items.reduce((sum, item) => sum + item.totalCents, 0);
@@ -117,6 +120,7 @@ export function SaleForm() {
       });
       router.push(`/vendas/${saleId}`);
     } catch (err) {
+      console.error(err);
       setFormError(
         err instanceof Error
           ? err.message

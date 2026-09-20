@@ -53,7 +53,8 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
         await createProduct(input);
       }
       onSuccess();
-    } catch {
+    } catch (err) {
+      console.error(err);
       setError("Não foi possível salvar o produto. Nenhum dado foi alterado.");
     } finally {
       setSubmitting(false);

@@ -38,7 +38,8 @@ export default function SalesDayDetailPage() {
         setDay(data.day);
         setOrders(data.orders);
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       setError(true);
     }
   }

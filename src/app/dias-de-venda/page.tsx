@@ -25,7 +25,8 @@ export default function DiasDeVendaPage() {
     setDays(null);
     try {
       setDays(await listSalesDays());
-    } catch {
+    } catch (err) {
+      console.error(err);
       setError(true);
     }
   }

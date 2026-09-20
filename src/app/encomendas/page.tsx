@@ -36,7 +36,8 @@ export default function EncomendasPage() {
     setOrders(null);
     try {
       setOrders(await listRecentOrders());
-    } catch {
+    } catch (err) {
+      console.error(err);
       setError(true);
     }
   }

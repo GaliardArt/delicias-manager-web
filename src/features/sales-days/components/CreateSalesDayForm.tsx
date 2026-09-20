@@ -29,6 +29,7 @@ export function CreateSalesDayForm({ onSuccess }: CreateSalesDayFormProps) {
       const id = await createSalesDay(date);
       onSuccess(id);
     } catch (err) {
+      console.error(err);
       setError(
         err instanceof Error
           ? err.message

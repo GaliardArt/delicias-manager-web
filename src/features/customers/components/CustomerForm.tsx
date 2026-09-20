@@ -42,7 +42,8 @@ export function CustomerForm({ customer, onSuccess }: CustomerFormProps) {
         await createCustomer(input);
       }
       onSuccess();
-    } catch {
+    } catch (err) {
+      console.error(err);
       setError("Não foi possível salvar o cliente. Nenhum dado foi alterado.");
     } finally {
       setSubmitting(false);

@@ -23,7 +23,8 @@ export default function VendasPage() {
     try {
       const data = await listRecentSales();
       setSales(data);
-    } catch {
+    } catch (err) {
+      console.error(err);
       setError(true);
     }
   }

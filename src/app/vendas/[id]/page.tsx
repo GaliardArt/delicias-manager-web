@@ -26,7 +26,8 @@ export default function SaleDetailPage() {
     try {
       const data = await getSaleWithPayments(params.id);
       setSale(data);
-    } catch {
+    } catch (err) {
+      console.error(err);
       setError(true);
     }
   }

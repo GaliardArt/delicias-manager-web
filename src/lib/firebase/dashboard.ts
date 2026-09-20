@@ -87,15 +87,12 @@ async function getUpcomingOrders(): Promise<Order[]> {
 // valores ao ser encerrado (seção 15), aqui calculamos ao vivo a partir dos
 // pedidos vinculados — igual à tela de detalhe (Fase 5).
 async function getNextSalesDay(): Promise<SalesDay | null> {
-  const q = query(
-    collection(db, "salesDays"),
-    where("closed", "==", false),
-    orderBy("date", "asc"),
-    limit(10)
-  );
+  const q = query(collection(db, "salesDays"), where("closed", "==", false));
   const snapshot = await getDocs(q);
   const today = todayIso();
-  const nextDayDoc = snapshot.docs.find((d) => d.data().date >= today);
+  const nextDayDoc = snapshot.docs
+    .filter((d) => d.data().date >= today)
+    .sort((a, b) => (a.data().date as string).localeCompare(b.data().date))[0];
   if (!nextDayDoc) return null;
 
   const ordersSnap = await getDocs(

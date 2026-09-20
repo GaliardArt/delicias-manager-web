@@ -15,14 +15,14 @@ import { Customer } from "@/types";
 import { logActivity } from "./activity";
 
 // Leitura só dos clientes ativos — usado no formulário de venda (Fase 3).
+// Ordena no cliente (não no Firestore) para não depender de um índice composto
+// (active + name) que exigiria um passo manual no Console do Firebase.
 export async function listActiveCustomers(): Promise<Customer[]> {
-  const q = query(
-    collection(db, "customers"),
-    where("active", "==", true),
-    orderBy("name", "asc")
-  );
+  const q = query(collection(db, "customers"), where("active", "==", true));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Customer));
+  return snapshot.docs
+    .map((d) => ({ id: d.id, ...d.data() } as Customer))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 // Lista todos os clientes (ativos e inativos) para a tela de gestão de clientes.

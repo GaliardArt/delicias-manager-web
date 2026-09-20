@@ -47,7 +47,8 @@ export default function DashboardPage() {
     setData(undefined);
     try {
       setData(await getDashboardSummary());
-    } catch {
+    } catch (err) {
+      console.error(err);
       setError(true);
     }
   }

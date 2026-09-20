@@ -14,14 +14,13 @@ import { db } from "./config";
 import { Product } from "@/types";
 
 // Leitura só dos produtos ativos — usado no formulário de venda (Fase 3).
+// Ordena no cliente (não no Firestore) pelo mesmo motivo do customers.ts.
 export async function listActiveProducts(): Promise<Product[]> {
-  const q = query(
-    collection(db, "products"),
-    where("active", "==", true),
-    orderBy("name", "asc")
-  );
+  const q = query(collection(db, "products"), where("active", "==", true));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Product));
+  return snapshot.docs
+    .map((d) => ({ id: d.id, ...d.data() } as Product))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 // Lista todos os produtos (ativos e inativos) para a tela de gestão de produtos.

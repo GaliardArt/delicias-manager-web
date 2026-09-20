@@ -64,7 +64,8 @@ export default function RelatoriosPage() {
       setSales(s);
       setProducts(p);
       setCustomers(c);
-    } catch {
+    } catch (err) {
+      console.error(err);
       setError(true);
     }
   }
@@ -117,7 +118,8 @@ export default function RelatoriosPage() {
       await navigator.clipboard.writeText(whatsappText);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
+    } catch (err) {
+      console.error(err);
       // Clipboard indisponível (ex: contexto não seguro) — sem problema, o
       // botão de WhatsApp continua funcionando normalmente.
     }

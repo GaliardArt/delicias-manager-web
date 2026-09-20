@@ -26,7 +26,8 @@ export default function ProdutosPage() {
     setProducts(null);
     try {
       setProducts(await listAllProducts());
-    } catch {
+    } catch (err) {
+      console.error(err);
       setError(true);
     }
   }

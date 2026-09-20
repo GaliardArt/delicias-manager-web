@@ -26,7 +26,8 @@ export default function ClientesPage() {
     setCustomers(null);
     try {
       setCustomers(await listAllCustomers());
-    } catch {
+    } catch (err) {
+      console.error(err);
       setError(true);
     }
   }

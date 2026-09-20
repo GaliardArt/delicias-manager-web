@@ -32,7 +32,8 @@ export default function ProductDetailPage() {
       const [p, s] = await Promise.all([getProduct(params.id), getProductStats(params.id)]);
       setProduct(p);
       setStats(s);
-    } catch {
+    } catch (err) {
+      console.error(err);
       setError(true);
     }
   }

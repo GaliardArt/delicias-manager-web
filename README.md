@@ -174,6 +174,26 @@ discutir antes de implementar (seção 31).
   e índices compostos, mas assume o volume de uma confeitaria pequena (mesmo
   trade-off documentado na Fase 6 e nas estatísticas de produto da Fase 2)
 
+## Correção pós-deploy: índice composto do Firestore
+
+Depois do primeiro deploy na Vercel, `listActiveCustomers`, `listActiveProducts` e o
+"próximo Dia de Venda" do Dashboard pararam de funcionar (Nova Venda, Nova Encomenda
+e Dashboard ficavam presos em "Não foi possível carregar"), enquanto o resto do
+sistema (cadastro/listagem simples) continuava normal. A causa: essas três consultas
+combinavam um filtro de igualdade (`where`) com uma ordenação (`orderBy`) em um
+**campo diferente** — isso exige um índice composto no Firestore que nunca foi
+criado, e o erro estava sendo engolido silenciosamente (nenhum `catch` dava
+`console.error`, só marcava `error: true` na tela).
+
+Corrigido dos dois lados:
+- As três consultas agora filtram só por igualdade e ordenam no cliente (JavaScript),
+  removendo a dependência de um índice composto — funciona direto, sem nenhum passo
+  manual no Console do Firebase
+- Todo `catch` do projeto agora dá `console.error(err)` antes de mostrar o erro na
+  tela, então qualquer problema parecido no futuro aparece no console do navegador
+  em vez de só a mensagem genérica "Verifique sua conexão ou as credenciais do
+  Firebase"
+
 ## Próximos passos (conforme seção 30 da especificação)
 
 - **Fase 8** — Insights e tendências (aprofundar o que a Fase 7 já começou)
