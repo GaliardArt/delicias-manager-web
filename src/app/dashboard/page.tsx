@@ -153,10 +153,10 @@ export default function DashboardPage() {
               </div>
             </div>
             <Link
-              href={`/dias-de-venda/${data.nextSalesDay.id}`}
+              href={`/dias-de-venda/aberto/${data.nextSalesDay.date}`}
               className="mt-4 flex items-center gap-1 text-sm font-medium text-brand-600"
             >
-              Ver Dia de Venda <ArrowRight className="h-3.5 w-3.5" />
+              Ver e fechar o dia <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </Card>
         )}

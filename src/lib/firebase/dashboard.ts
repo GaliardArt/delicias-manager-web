@@ -1,23 +1,12 @@
-import {
-  collection,
-  getDocs,
-  limit,
-  orderBy,
-  query,
-  Timestamp,
-  where,
-} from "firebase/firestore";
+import { collection, getDocs, limit, orderBy, query, Timestamp, where } from "firebase/firestore";
 import { db } from "./config";
 import { ActivityEvent, DashboardSummary, Order, SalesDay } from "@/types";
-import { summarizeOrders } from "./sales-days";
+import { getOpenDayGroups, summarizeOrders, todayIso } from "./sales-days";
+import { summarizeSales } from "./reports";
 
 function tsToIso(value: unknown): string {
   if (value instanceof Timestamp) return value.toDate().toISOString();
   return new Date().toISOString();
-}
-
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
 }
 
 async function getTodaySalesTotals() {
@@ -72,7 +61,6 @@ async function getUpcomingOrders(): Promise<Order[]> {
         payments: [],
         orderDate: data.orderDate,
         expectedDate: data.expectedDate,
-        salesDayId: data.salesDayId,
         deliveryAddress: data.deliveryAddress,
         notes: data.notes,
         status: data.status,
@@ -82,49 +70,25 @@ async function getUpcomingOrders(): Promise<Order[]> {
     .slice(0, 5);
 }
 
-// Próximo Dia de Venda aberto: busca os abertos ordenados por data e pega o
-// primeiro a partir de hoje. Como o Dia de Venda só grava o instantâneo de
-// valores ao ser encerrado (seção 15), aqui calculamos ao vivo a partir dos
-// pedidos vinculados — igual à tela de detalhe (Fase 5).
+// Próximo Dia de Venda: o primeiro grupo automático (encomendas agrupadas por
+// data, ainda sem fechamento) a partir de hoje. Não existe mais um documento
+// "aberto" no Firestore — o grupo é calculado ao vivo (Fase Dias de Venda
+// automáticos).
 async function getNextSalesDay(): Promise<SalesDay | null> {
-  const q = query(collection(db, "salesDays"), where("closed", "==", false));
-  const snapshot = await getDocs(q);
+  const groups = await getOpenDayGroups();
   const today = todayIso();
-  const nextDayDoc = snapshot.docs
-    .filter((d) => d.data().date >= today)
-    .sort((a, b) => (a.data().date as string).localeCompare(b.data().date))[0];
-  if (!nextDayDoc) return null;
+  const next = groups.find((g) => g.date >= today);
+  if (!next) return null;
 
-  const ordersSnap = await getDocs(
-    query(collection(db, "orders"), where("salesDayId", "==", nextDayDoc.id))
-  );
-  const orders: Order[] = ordersSnap.docs.map((d) => {
-    const data = d.data();
-    return {
-      id: d.id,
-      customerId: data.customerId,
-      customerName: data.customerName,
-      items: data.items ?? [],
-      totalCents: data.totalCents,
-      paidCents: data.paidCents,
-      pendingCents: data.pendingCents,
-      payments: [],
-      orderDate: data.orderDate,
-      expectedDate: data.expectedDate,
-      salesDayId: data.salesDayId,
-      deliveryAddress: data.deliveryAddress,
-      notes: data.notes,
-      status: data.status,
-    };
-  });
-  const summary = summarizeOrders(orders);
+  const summary = summarizeOrders(next.orders);
+  const salesSummary = summarizeSales(next.sales);
 
   return {
-    id: nextDayDoc.id,
-    date: nextDayDoc.data().date,
-    expectedCents: summary.expectedCents,
-    receivedCents: summary.receivedCents,
-    pendingCents: summary.pendingCents,
+    id: next.date,
+    date: next.date,
+    expectedCents: summary.expectedCents + salesSummary.faturamentoCents,
+    receivedCents: summary.receivedCents + salesSummary.recebidoCents,
+    pendingCents: summary.pendingCents + salesSummary.pendenteCents,
     cancelledCents: summary.cancelledCents,
     notRealizedCents: summary.notRealizedCents,
     ordersCount: summary.ordersCount,

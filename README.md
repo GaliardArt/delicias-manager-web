@@ -109,27 +109,11 @@ arquitetura, será discutida antes de implementada (seção 31).
 O campo `salesDayId` já existe no tipo `Order` para vincular a encomenda a um Dia de
 Venda, mas fica reservado por enquanto — a Fase 5 ainda não foi implementada.
 
-### Fase 5 — Dias de Venda
-- **`/dias-de-venda`** — lista todos os Dias de Venda (mais recente primeiro), com
-  badge Aberto/Encerrado
-- **`/dias-de-venda/nova`** *(modal na própria listagem)* — cria um Dia de Venda para
-  uma data; encomendas já cadastradas com essa data de entrega prevista e sem outro
-  Dia de Venda são **vinculadas automaticamente** (`createSalesDay`,
-  `src/lib/firebase/sales-days.ts`)
-- Encomendas criadas depois, na Fase 4 (`createOrder`), também se vinculam sozinhas
-  a um Dia de Venda aberto já existente para a mesma data — os dois lados ficam
-  sempre consistentes sem exigir um passo manual extra
-- **`/dias-de-venda/[id]`** — resumo (seção 14): total de pedidos, esperado,
-  recebido, pendente, fiado e cancelados, calculados ao vivo a partir dos pedidos
-  vinculados enquanto o dia está aberto; agrupamento **por endereço**, mostrando
-  cliente e quantidade de itens por parada de entrega
-- **Encerrar Dia de Venda** (seção 15): grava um instantâneo fechado dos valores
-  esperado/recebido/pendente/cancelado/não realizado — sem alterar os pedidos em si,
-  então cada valor continua rastreável até sua origem (seção 21)
-- "Não realizado" é calculado como o valor dos pedidos que, no momento do
-  fechamento, ainda não estavam com status "Entregue" nem "Cancelada"
-- Auditoria: `dia_venda_criado` e `dia_venda_encerrado` (seção 22) — os dois tipos
-  que faltavam no `ActivityType`, agora completos
+### Fase 5 — Dias de Venda (redesenhado — veja "Dias de Venda automáticos" abaixo)
+A versão original desta fase (criação manual + vínculo por `salesDayId`) foi
+substituída pelo modelo automático descrito na seção "Ajustes pós-lançamento". O que
+seguiu igual: o conceito de resumo (seção 14), o agrupamento por endereço, e o
+registro de `dia_venda_encerrado` na auditoria (seção 22).
 
 ### Fase 6 — Dashboard com dados reais
 - O Dashboard (`src/lib/firebase/dashboard.ts`) buscou o lugar do mock por consultas
@@ -220,6 +204,49 @@ Corrigido dos dois lados:
   cliente + produtos a produzir (agrupada por data de entrega), a partir de todas as
   encomendas em aberto — não é um relatório financeiro, é uma lista de tarefas para
   quem vai produzir. Usa o mesmo mecanismo padrão `wa.me` da Fase 7.
+
+### Dias de Venda automáticos (redesenho da Fase 5)
+
+O fluxo original (criar manualmente um Dia de Venda, vincular por `salesDayId`)
+gerava confusão. Foi substituído por um modelo totalmente automático:
+
+- **Nenhuma criação manual.** `/dias-de-venda` agrupa, ao vivo, as encomendas ativas
+  por data prevista de entrega — cada data com encomenda vira um "lembrete" na tela,
+  com badge "Hoje" ou "Atrasado" quando for o caso. Não existe mais botão "Novo Dia
+  de Venda" nem modal.
+- **`/dias-de-venda/aberto/[date]`** — a tela de fechamento. Lista cada encomenda do
+  dia com dois botões: **Pago** (registra de verdade o pagamento do valor pendente,
+  via a mesma transação da Fase 4) e **Falta pagar** (marca como fiado, sem alterar
+  nada no Firestore). Encomendas que já estavam 100% pagas antes de abrir a tela
+  entram pré-marcadas como "Pago" automaticamente — o foco fica só no que ainda
+  precisa de decisão. **Assim que todas as encomendas do dia estiverem marcadas, o
+  dia se fecha sozinho**: grava o instantâneo (`closeDay`,
+  `src/lib/firebase/sales-days.ts`) com os totais de esperado/recebido/pendente
+  (fiado)/cancelado/não realizado, e manda para o histórico. Nenhum botão extra de
+  "Encerrar" é necessário.
+- **`/dias-de-venda/historico`** e **`/dias-de-venda/historico/[id]`** — mesma ideia
+  do histórico de Encomendas: os dias já fechados saem da lista principal e ficam
+  aqui, com o resumo travado e a lista de encomendas com o resultado final
+  (pago/faltou pagar quanto) — o controle de "quem ainda deve" fica registrado ali.
+- Um Dia de Venda só existe como documento no Firestore **depois** de fechado —
+  enquanto aberto, é inteiramente calculado a partir das encomendas (`expectedDate`
+  como chave de agrupamento). Isso eliminou o campo `salesDayId` do tipo `Order` e
+  toda a lógica de vínculo manual/automático da versão anterior — mais simples de
+  manter e sem risco de encomenda "órfã" sem Dia de Venda.
+- O card "Próximo Dia de Venda" do Dashboard (Fase 6) e o agrupamento por endereço
+  (seção 14) continuam funcionando, só que agora alimentados por esse novo modelo.
+- **Vendas avulsas somam no valor do dia.** Uma venda de balcão (Fase 3, sem ser
+  encomenda) feita numa data entra automaticamente no valor daquele Dia de Venda,
+  junto com as encomendas previstas para a mesma data — inclusive quando o dia não
+  tem nenhuma encomenda, só vendas. A tela de fechamento mostra um card "Vendas do
+  dia" (somente leitura, já que o pagamento de cada venda é resolvido na própria
+  tela de Vendas) e soma isso ao instantâneo gravado no fechamento. O
+  `SalesDayDoc` guarda `salesCents`/`salesReceivedCents`/`salesCount` separado dos
+  totais combinados, pra nunca esconder se um valor veio de encomenda ou de venda
+  avulsa (seção 21). Como uma venda não tem "falta decidir" (ela já nasce paga,
+  parcial ou fiado), o fechamento automático continua disparado só pelas
+  encomendas; um dia com só vendas e nenhuma encomenda ganha um botão manual
+  "Fechar dia" em vez de fechar sozinho ao abrir a tela.
 
 ### Fase 8 — Insights
 - Card "Insights" na tela de Relatórios, abaixo de Tendências:

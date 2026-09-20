@@ -14,7 +14,6 @@ import {
 import { db, auth } from "./config";
 import { Order, OrderStatus, Payment, PaymentMethod, SaleItem } from "@/types";
 import { logActivity } from "./activity";
-import { findOpenSalesDayByDate } from "./sales-days";
 
 function tsToIso(value: unknown): string {
   if (value instanceof Timestamp) return value.toDate().toISOString();
@@ -63,10 +62,6 @@ export async function createOrder(input: CreateOrderInput): Promise<string> {
   const pendingCents = totalCents - initialPaymentCents;
   const orderDate = new Date().toISOString().slice(0, 10);
 
-  // Se já existir um Dia de Venda aberto para essa data, a encomenda entra
-  // vinculada automaticamente (seção 12: "Dia de Venda relacionado").
-  const existingSalesDay = await findOpenSalesDayByDate(expectedDate);
-
   batch.set(orderRef, {
     customerId,
     customerName,
@@ -76,7 +71,6 @@ export async function createOrder(input: CreateOrderInput): Promise<string> {
     pendingCents,
     orderDate,
     expectedDate,
-    salesDayId: existingSalesDay?.id ?? null,
     deliveryAddress: deliveryAddress ?? "",
     notes: notes ?? "",
     status,
@@ -174,7 +168,6 @@ export async function getOrderWithPayments(orderId: string): Promise<Order | nul
     pendingCents: data.pendingCents,
     orderDate: data.orderDate,
     expectedDate: data.expectedDate,
-    salesDayId: data.salesDayId,
     deliveryAddress: data.deliveryAddress,
     notes: data.notes,
     status: data.status,
