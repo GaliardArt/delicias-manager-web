@@ -44,8 +44,7 @@ Abra http://localhost:3000 — a rota raiz redireciona para `/dashboard`.
 - Layout responsivo: sidebar (desktop) + barra inferior de navegação (mobile/Android)
 - Tela de login com Firebase Authentication
 - Dashboard com indicadores, próximo Dia de Venda, próximas encomendas e atividades
-  recentes (atualmente com **dados de demonstração** em `src/lib/mock/dashboard.ts` —
-  a Fase 6 vai conectar isso aos dados reais)
+  recentes — conectado aos dados reais do Firestore desde a Fase 6
 - Componentes de UI reutilizáveis: Button, Input, Select, MoneyInput, Card, Badge,
   EmptyState, StatCard, Modal, ConfirmDialog
 - Utilitários de formatação pt-BR (moeda, data, telefone) — `src/lib/utils/format.ts`
@@ -110,12 +109,74 @@ arquitetura, será discutida antes de implementada (seção 31).
 O campo `salesDayId` já existe no tipo `Order` para vincular a encomenda a um Dia de
 Venda, mas fica reservado por enquanto — a Fase 5 ainda não foi implementada.
 
+### Fase 5 — Dias de Venda
+- **`/dias-de-venda`** — lista todos os Dias de Venda (mais recente primeiro), com
+  badge Aberto/Encerrado
+- **`/dias-de-venda/nova`** *(modal na própria listagem)* — cria um Dia de Venda para
+  uma data; encomendas já cadastradas com essa data de entrega prevista e sem outro
+  Dia de Venda são **vinculadas automaticamente** (`createSalesDay`,
+  `src/lib/firebase/sales-days.ts`)
+- Encomendas criadas depois, na Fase 4 (`createOrder`), também se vinculam sozinhas
+  a um Dia de Venda aberto já existente para a mesma data — os dois lados ficam
+  sempre consistentes sem exigir um passo manual extra
+- **`/dias-de-venda/[id]`** — resumo (seção 14): total de pedidos, esperado,
+  recebido, pendente, fiado e cancelados, calculados ao vivo a partir dos pedidos
+  vinculados enquanto o dia está aberto; agrupamento **por endereço**, mostrando
+  cliente e quantidade de itens por parada de entrega
+- **Encerrar Dia de Venda** (seção 15): grava um instantâneo fechado dos valores
+  esperado/recebido/pendente/cancelado/não realizado — sem alterar os pedidos em si,
+  então cada valor continua rastreável até sua origem (seção 21)
+- "Não realizado" é calculado como o valor dos pedidos que, no momento do
+  fechamento, ainda não estavam com status "Entregue" nem "Cancelada"
+- Auditoria: `dia_venda_criado` e `dia_venda_encerrado` (seção 22) — os dois tipos
+  que faltavam no `ActivityType`, agora completos
+
+### Fase 6 — Dashboard com dados reais
+- O Dashboard (`src/lib/firebase/dashboard.ts`) buscou o lugar do mock por consultas
+  reais ao Firestore, com estados de loading (skeleton) e erro (com "Tentar
+  novamente"), no mesmo padrão das outras telas
+- **Vendas hoje / Recebido / Pendente / Fiado** — agregados a partir das vendas
+  criadas no intervalo do dia atual (`sales` filtradas por `createdAt`)
+- **Próximas encomendas** — as 5 encomendas mais próximas pela data prevista de
+  entrega, excluindo as já entregues ou canceladas
+- **Próximo Dia de Venda** — o primeiro Dia de Venda aberto a partir de hoje, com
+  esperado/recebido/pendente calculados ao vivo a partir dos pedidos vinculados
+  (mesma lógica `summarizeOrders` da Fase 5), já que esses valores só ficam
+  gravados no documento depois do fechamento
+- **Atividades recentes** — as 6 últimas entradas de `activityHistory`
+
+**Limite assumido conscientemente:** "Recebido hoje" soma o `paidCents` das vendas
+*criadas* hoje — não inclui pagamentos feitos hoje sobre vendas de dias anteriores
+(isso exigiria uma consulta de grupo de coleção sobre todas as subcoleções
+`payments`, com índice dedicado). Para o dia a dia de uma confeitaria pequena isso
+cobre o caso comum; se precisar do número exato de "dinheiro que entrou hoje"
+somando pagamentos avulsos de vendas antigas, isso é uma mudança de escopo que vale
+discutir antes de implementar (seção 31).
+
+### Fase 7 — Relatórios e WhatsApp
+- **`/relatorios`** — seletor de período (Hoje / Últimos 7 dias / Últimos 30 dias /
+  Personalizado) e todos os blocos da seção 16 da spec:
+  - **Vendas**: faturamento, recebido, pendente, quantidade de vendas, ticket médio
+  - **Produtos**: mais vendidos e menos vendidos no período (produtos ativos sem
+    nenhuma venda aparecem em "menos vendidos" com 0 unidades — sinal útil, não
+    omitido)
+  - **Clientes**: que mais compraram no período, valores pendentes (saldo global,
+    não só do período) e clientes ativos sem compra nos últimos 30 dias
+  - **Tendências**: variação de faturamento e ticket médio vs. o período anterior
+    de mesmo tamanho, dia da semana de maior movimento, produtos em alta/queda —
+    e exatamente a frase da seção 16 ("Dados insuficientes para gerar esta
+    análise.") quando não há base de comparação, nunca um número inventado
+- **Compartilhar no WhatsApp** (seção 17): monta o texto no formato do exemplo da
+  spec e abre `wa.me` com o mecanismo padrão de compartilhamento do WhatsApp — sem
+  reimplementar nada de mensageria própria; botão "Copiar" como alternativa
+- `src/lib/firebase/reports.ts` faz **uma única leitura** de toda a coleção `sales`
+  e calcula período, comparação e agregações em memória — evita múltiplas consultas
+  e índices compostos, mas assume o volume de uma confeitaria pequena (mesmo
+  trade-off documentado na Fase 6 e nas estatísticas de produto da Fase 2)
+
 ## Próximos passos (conforme seção 30 da especificação)
 
-- **Fase 5** — Dias de Venda (agrupamento por endereço, fechamento)
-- **Fase 6** — Conectar o Dashboard aos dados reais do Firestore (hoje usa mock)
-- **Fase 7** — Relatórios + geração de resumo para WhatsApp
-- **Fase 8** — Insights e tendências
+- **Fase 8** — Insights e tendências (aprofundar o que a Fase 7 já começou)
 
 Seguindo a regra da seção 31: mudanças que afetem banco de dados, arquitetura, fluxo de
 vendas/pagamentos ou autenticação serão sempre discutidas antes da implementação.

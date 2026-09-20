@@ -102,7 +102,9 @@ export type ActivityType =
   | "pagamento_recebido"
   | "encomenda_criada"
   | "cliente_cadastrado"
-  | "pedido_cancelado";
+  | "pedido_cancelado"
+  | "dia_venda_criado"
+  | "dia_venda_encerrado";
 
 export interface ActivityEvent {
   id: string;
