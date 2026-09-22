@@ -28,6 +28,14 @@ export interface Customer {
   createdAt: string; // ISO date
 }
 
+export interface RecipeItem {
+  sourceType: "insumo" | "ingrediente";
+  sourceId: string;
+  sourceName: string;
+  quantity: number; // na unidade do insumo/ingrediente referenciado
+  unit: string;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -37,6 +45,44 @@ export interface Product {
   description?: string;
   active: boolean;
   createdAt: string;
+  recipeItems: RecipeItem[]; // receita (insumos e/ou ingredientes) — custo é calculado, nunca digitado
+  stockQuantity: number; // estoque de produto pronto; pode ficar negativo
+}
+
+// Insumo = matéria-prima comprada (farinha, leite condensado, cacau...).
+export interface Insumo {
+  id: string;
+  name: string;
+  unit: string; // g, kg, ml, l, unidade...
+  purchasePriceCents: number; // valor pago no último lote/compra
+  purchaseQuantity: number; // quantidade daquele lote, na mesma unidade
+  unitCostCents: number; // derivado: purchasePriceCents / purchaseQuantity
+  stockQuantity: number;
+  active: boolean;
+  createdAt: string;
+}
+
+// Ingrediente = feito a partir de uma receita de insumos e/ou outros
+// ingredientes (ex: brigadeiro, que depois entra na receita de um bolo).
+export interface Ingrediente {
+  id: string;
+  name: string;
+  yieldQuantity: number; // quanto a receita rende
+  yieldUnit: string;
+  recipeItems: RecipeItem[];
+  unitCostCents: number; // custo por yieldUnit, calculado a partir da receita
+  stockQuantity: number;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface Expense {
+  id: string;
+  description: string;
+  category: string;
+  amountCents: number;
+  date: string; // YYYY-MM-DD
+  createdAt: string;
 }
 
 export interface SaleItem {
@@ -44,6 +90,7 @@ export interface SaleItem {
   productName: string;
   quantity: number;
   unitPriceCents: number;
+  unitCostCents: number; // custo do produto no momento da venda, via receita
   totalCents: number;
 }
 

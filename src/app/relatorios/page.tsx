@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { listActiveProducts } from "@/lib/firebase/products";
 import { listActiveCustomers } from "@/lib/firebase/customers";
+import { listAllExpenses } from "@/lib/firebase/expenses";
 import {
   getAllSalesRaw,
   getPeriodPreset,
@@ -36,7 +37,7 @@ import {
   RawSale,
   PeriodKey,
 } from "@/lib/firebase/reports";
-import { Product, Customer } from "@/types";
+import { Product, Customer, Expense } from "@/types";
 import { formatCurrencyBRL, formatDateBR } from "@/lib/utils/format";
 
 function todayIso(): string {
@@ -47,6 +48,7 @@ export default function RelatoriosPage() {
   const [sales, setSales] = useState<RawSale[] | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [error, setError] = useState(false);
 
   const [periodKey, setPeriodKey] = useState<PeriodKey>("semana");
@@ -58,14 +60,16 @@ export default function RelatoriosPage() {
     setError(false);
     setSales(null);
     try {
-      const [s, p, c] = await Promise.all([
+      const [s, p, c, e] = await Promise.all([
         getAllSalesRaw(),
         listActiveProducts(),
         listActiveCustomers(),
+        listAllExpenses(),
       ]);
       setSales(s);
       setProducts(p);
       setCustomers(c);
+      setExpenses(e);
     } catch (err) {
       console.error(err);
       setError(true);
@@ -91,6 +95,15 @@ export default function RelatoriosPage() {
   );
 
   const salesSummary = useMemo(() => summarizeSales(current), [current]);
+  const despesasCents = useMemo(() => {
+    return expenses
+      .filter((e) => {
+        const d = new Date(e.date + "T00:00:00");
+        return d >= period.start && d < period.end;
+      })
+      .reduce((sum, e) => sum + e.amountCents, 0);
+  }, [expenses, period]);
+  const lucroLiquidoCents = salesSummary.lucroBrutoCents - despesasCents;
   const productsSummary = useMemo(
     () => summarizeProducts(current, products),
     [current, products]
@@ -248,6 +261,48 @@ export default function RelatoriosPage() {
                 </p>
               </div>
             </div>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Lucro — {period.label}</CardTitle>
+            </CardHeader>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div>
+                <p className="text-xs text-ink-muted">Custo (CMV)</p>
+                <p className="font-display text-base font-semibold text-ink">
+                  {formatCurrencyBRL(salesSummary.custoCents)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-ink-muted">Lucro bruto</p>
+                <p className="font-display text-base font-semibold text-success-700">
+                  {formatCurrencyBRL(salesSummary.lucroBrutoCents)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-ink-muted">Despesas (Contas)</p>
+                <p className="font-display text-base font-semibold text-danger-700">
+                  {formatCurrencyBRL(despesasCents)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-ink-muted">Lucro líquido</p>
+                <p
+                  className={`font-display text-base font-semibold ${
+                    lucroLiquidoCents >= 0 ? "text-success-700" : "text-danger-700"
+                  }`}
+                >
+                  {formatCurrencyBRL(lucroLiquidoCents)}
+                </p>
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-ink-muted">
+              Bruto = faturamento − custo dos produtos vendidos (pela receita de cada
+              um). Líquido = bruto − despesas registradas em Contas no período. Vendas
+              sem receita cadastrada entram com custo R$ 0,00 — o bruto fica
+              superestimado até você cadastrar a receita do produto.
+            </p>
           </Card>
 
           <div className="grid gap-4 md:grid-cols-2">

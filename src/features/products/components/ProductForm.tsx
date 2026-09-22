@@ -1,29 +1,42 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { Button } from "@/components/ui/Button";
-import { Product } from "@/types";
+import { RecipeBuilder } from "@/features/recipes/components/RecipeBuilder";
+import { Ingrediente, Insumo, Product, RecipeItem } from "@/types";
 import { createProduct, updateProduct } from "@/lib/firebase/products";
+import { resolveProductCost, toInsumosMap, toIngredientesMap } from "@/lib/costing";
+import { formatCurrencyBRL } from "@/lib/utils/format";
 
 const unitOptions = ["unidade", "caixa", "pacote", "kg", "dúzia"];
 
 interface ProductFormProps {
   product?: Product;
+  insumos: Insumo[];
+  ingredientes: Ingrediente[];
   onSuccess: () => void;
 }
 
-export function ProductForm({ product, onSuccess }: ProductFormProps) {
+export function ProductForm({ product, insumos, ingredientes, onSuccess }: ProductFormProps) {
   const [name, setName] = useState(product?.name ?? "");
   const [category, setCategory] = useState(product?.category ?? "");
   const [unit, setUnit] = useState(product?.unit ?? "unidade");
   const [priceCents, setPriceCents] = useState(product?.priceCents ?? 0);
   const [description, setDescription] = useState(product?.description ?? "");
+  const [recipeItems, setRecipeItems] = useState<RecipeItem[]>(product?.recipeItems ?? []);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const previewCost = useMemo(
+    () => resolveProductCost(recipeItems, toInsumosMap(insumos), toIngredientesMap(ingredientes)),
+    [recipeItems, insumos, ingredientes]
+  );
+  const previewMargin = priceCents - previewCost;
+  const previewMarginPct = priceCents > 0 ? (previewMargin / priceCents) * 100 : 0;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -46,6 +59,7 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
         unit,
         priceCents,
         description: description.trim(),
+        recipeItems,
       };
       if (product) {
         await updateProduct(product.id, input);
@@ -77,7 +91,7 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
         placeholder="Doces, Bolos, Biscoitos..."
       />
       <div className="grid grid-cols-2 gap-3">
-        <MoneyInput label="Preço" valueCents={priceCents} onValueCentsChange={setPriceCents} />
+        <MoneyInput label="Preço de venda" valueCents={priceCents} onValueCentsChange={setPriceCents} />
         <Select label="Unidade" value={unit} onChange={(e) => setUnit(e.target.value)}>
           {unitOptions.map((u) => (
             <option key={u} value={u}>
@@ -92,6 +106,34 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
         onChange={(e) => setDescription(e.target.value)}
         placeholder="Detalhes do produto"
       />
+
+      <div>
+        <p className="mb-1.5 text-sm font-medium text-ink-muted">
+          Receita (opcional — deixe vazio se não quiser calcular o custo)
+        </p>
+        <RecipeBuilder
+          insumos={insumos}
+          ingredientes={ingredientes}
+          value={recipeItems}
+          onChange={setRecipeItems}
+        />
+      </div>
+
+      {recipeItems.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 rounded-xl bg-babypink px-3.5 py-3 text-sm">
+          <div>
+            <span className="block text-brand-700">Custo calculado</span>
+            <span className="font-semibold text-brand-800">{formatCurrencyBRL(previewCost)}</span>
+          </div>
+          <div>
+            <span className="block text-brand-700">Margem</span>
+            <span className="font-semibold text-brand-800">
+              {formatCurrencyBRL(previewMargin)} ({previewMarginPct.toFixed(0)}%)
+            </span>
+          </div>
+        </div>
+      )}
+
       {error && (
         <p className="flex items-center gap-2 rounded-xl bg-danger-50 px-3.5 py-2.5 text-sm text-danger-700">
           <AlertCircle className="h-4 w-4 shrink-0" /> {error}

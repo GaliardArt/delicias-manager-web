@@ -9,7 +9,13 @@ export interface RawSale {
   paidCents: number;
   pendingCents: number;
   createdAt: Date;
-  items: { productId: string; productName: string; quantity: number; totalCents: number }[];
+  items: {
+    productId: string;
+    productName: string;
+    quantity: number;
+    unitCostCents: number;
+    totalCents: number;
+  }[];
 }
 
 // Uma única leitura da coleção `sales` — tudo o mais (período, comparações,
@@ -23,6 +29,7 @@ export async function getAllSalesRaw(): Promise<RawSale[]> {
     const data = d.data();
     const createdAt =
       data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date();
+    const items = Array.isArray(data.items) ? data.items : [];
     return {
       customerId: data.customerId,
       customerName: data.customerName,
@@ -30,7 +37,13 @@ export async function getAllSalesRaw(): Promise<RawSale[]> {
       paidCents: data.paidCents,
       pendingCents: data.pendingCents,
       createdAt,
-      items: data.items ?? [],
+      items: items.map((item) => ({
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity,
+        unitCostCents: item.unitCostCents ?? 0,
+        totalCents: item.totalCents,
+      })),
     };
   });
 }
@@ -94,6 +107,8 @@ export interface SalesSummary {
   pendenteCents: number;
   quantidadeVendas: number;
   ticketMedioCents: number;
+  custoCents: number;
+  lucroBrutoCents: number;
 }
 
 export function summarizeSales(sales: RawSale[]): SalesSummary {
@@ -102,7 +117,20 @@ export function summarizeSales(sales: RawSale[]): SalesSummary {
   const pendenteCents = sales.reduce((s, v) => s + v.pendingCents, 0);
   const quantidadeVendas = sales.length;
   const ticketMedioCents = quantidadeVendas > 0 ? Math.round(faturamentoCents / quantidadeVendas) : 0;
-  return { faturamentoCents, recebidoCents, pendenteCents, quantidadeVendas, ticketMedioCents };
+  const custoCents = sales.reduce(
+    (s, v) => s + v.items.reduce((si, item) => si + item.unitCostCents * item.quantity, 0),
+    0
+  );
+  const lucroBrutoCents = faturamentoCents - custoCents;
+  return {
+    faturamentoCents,
+    recebidoCents,
+    pendenteCents,
+    quantidadeVendas,
+    ticketMedioCents,
+    custoCents,
+    lucroBrutoCents,
+  };
 }
 
 export interface ProductRanking {

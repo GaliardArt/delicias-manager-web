@@ -9,10 +9,13 @@ import { Select } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Customer, OrderStatus, PaymentMethod, Product, SaleItem } from "@/types";
+import { Customer, Ingrediente, Insumo, OrderStatus, PaymentMethod, Product, SaleItem } from "@/types";
 import { listActiveCustomers } from "@/lib/firebase/customers";
 import { listActiveProducts } from "@/lib/firebase/products";
+import { listActiveInsumos } from "@/lib/firebase/insumos";
+import { listActiveIngredientes } from "@/lib/firebase/ingredientes";
 import { createOrder } from "@/lib/firebase/orders";
+import { resolveProductCost, toInsumosMap, toIngredientesMap } from "@/lib/costing";
 import { formatCurrencyBRL } from "@/lib/utils/format";
 import { paymentMethodOptions } from "@/lib/utils/payment-method";
 import { orderStatusLabel } from "@/lib/utils/order-status";
@@ -30,6 +33,8 @@ export function OrderForm() {
 
   const [customers, setCustomers] = useState<Customer[] | null>(null);
   const [products, setProducts] = useState<Product[] | null>(null);
+  const [insumos, setInsumos] = useState<Insumo[]>([]);
+  const [ingredientes, setIngredientes] = useState<Ingrediente[]>([]);
   const [loadError, setLoadError] = useState(false);
 
   const [customerId, setCustomerId] = useState("");
@@ -50,10 +55,17 @@ export function OrderForm() {
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([listActiveCustomers(), listActiveProducts()])
-      .then(([c, p]) => {
+    Promise.all([
+      listActiveCustomers(),
+      listActiveProducts(),
+      listActiveInsumos(),
+      listActiveIngredientes(),
+    ])
+      .then(([c, p, ins, ing]) => {
         setCustomers(c);
         setProducts(p);
+        setInsumos(ins);
+        setIngredientes(ing);
       })
       .catch((err) => {
         console.error(err);
@@ -83,6 +95,12 @@ export function OrderForm() {
     const product = products?.find((p) => p.id === pendingProductId);
     if (!product || pendingQuantity <= 0) return;
 
+    const unitCostCents = resolveProductCost(
+      product.recipeItems,
+      toInsumosMap(insumos),
+      toIngredientesMap(ingredientes)
+    );
+
     setItems((prev) => [
       ...prev,
       {
@@ -90,6 +108,7 @@ export function OrderForm() {
         productName: product.name,
         quantity: pendingQuantity,
         unitPriceCents: pendingPriceCents,
+        unitCostCents,
         totalCents: pendingQuantity * pendingPriceCents,
       },
     ]);

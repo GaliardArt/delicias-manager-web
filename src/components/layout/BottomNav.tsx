@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { LayoutGrid } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { navItems } from "./nav-items";
 
 export function BottomNav() {
   const pathname = usePathname();
   const items = navItems.filter((item) => item.primaryMobile);
+  const isMoreActive = items.every((item) => !pathname.startsWith(item.href));
 
   return (
     <nav
@@ -39,12 +41,36 @@ export function BottomNav() {
                     active ? "font-semibold text-brand-600" : "text-ink-faint"
                   )}
                 >
-                  {item.label === "Dias de Venda" ? "Dias" : item.label}
+                  {item.label}
                 </span>
               </Link>
             </li>
           );
         })}
+        <li>
+          <Link
+            href="/mais"
+            className="flex min-h-[56px] flex-col items-center justify-center gap-0.5 px-1"
+          >
+            <LayoutGrid
+              className={cn(
+                "h-6 w-6 transition-colors",
+                isMoreActive && pathname.startsWith("/mais") ? "text-brand-500" : "text-ink-faint"
+              )}
+              strokeWidth={isMoreActive && pathname.startsWith("/mais") ? 2.4 : 2}
+            />
+            <span
+              className={cn(
+                "text-[10.5px] leading-none",
+                isMoreActive && pathname.startsWith("/mais")
+                  ? "font-semibold text-brand-600"
+                  : "text-ink-faint"
+              )}
+            >
+              Mais
+            </span>
+          </Link>
+        </li>
       </ul>
     </nav>
   );

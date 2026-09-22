@@ -10,10 +10,13 @@ import { Input } from "@/components/ui/Input";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Checkbox } from "@/components/ui/Checkbox";
-import { Customer, PaymentMethod, Product, SaleItem } from "@/types";
+import { Customer, Ingrediente, Insumo, PaymentMethod, Product, SaleItem } from "@/types";
 import { listActiveCustomers } from "@/lib/firebase/customers";
 import { listActiveProducts } from "@/lib/firebase/products";
+import { listActiveInsumos } from "@/lib/firebase/insumos";
+import { listActiveIngredientes } from "@/lib/firebase/ingredientes";
 import { createSale } from "@/lib/firebase/sales";
+import { resolveProductCost, toInsumosMap, toIngredientesMap } from "@/lib/costing";
 import { formatCurrencyBRL } from "@/lib/utils/format";
 import { paymentMethodOptions } from "@/lib/utils/payment-method";
 import { Users } from "lucide-react";
@@ -23,6 +26,8 @@ export function SaleForm() {
 
   const [customers, setCustomers] = useState<Customer[] | null>(null);
   const [products, setProducts] = useState<Product[] | null>(null);
+  const [insumos, setInsumos] = useState<Insumo[]>([]);
+  const [ingredientes, setIngredientes] = useState<Ingrediente[]>([]);
   const [loadError, setLoadError] = useState(false);
 
   const [customerId, setCustomerId] = useState("");
@@ -42,10 +47,17 @@ export function SaleForm() {
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([listActiveCustomers(), listActiveProducts()])
-      .then(([c, p]) => {
+    Promise.all([
+      listActiveCustomers(),
+      listActiveProducts(),
+      listActiveInsumos(),
+      listActiveIngredientes(),
+    ])
+      .then(([c, p, ins, ing]) => {
         setCustomers(c);
         setProducts(p);
+        setInsumos(ins);
+        setIngredientes(ing);
       })
       .catch((err) => {
         console.error(err);
@@ -75,11 +87,18 @@ export function SaleForm() {
     const product = products?.find((p) => p.id === pendingProductId);
     if (!product || pendingQuantity <= 0) return;
 
+    const unitCostCents = resolveProductCost(
+      product.recipeItems,
+      toInsumosMap(insumos),
+      toIngredientesMap(ingredientes)
+    );
+
     const newItem: SaleItem = {
       productId: product.id,
       productName: product.name,
       quantity: pendingQuantity,
       unitPriceCents: pendingPriceCents,
+      unitCostCents,
       totalCents: pendingQuantity * pendingPriceCents,
     };
     setItems((prev) => [...prev, newItem]);

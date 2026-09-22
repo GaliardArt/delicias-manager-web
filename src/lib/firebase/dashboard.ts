@@ -3,6 +3,7 @@ import { db } from "./config";
 import { ActivityEvent, DashboardSummary, Order, SalesDay } from "@/types";
 import { getOpenDayGroups, summarizeOrders, todayIso } from "./sales-days";
 import { summarizeSales } from "./reports";
+import { normalizeSaleItems } from "@/lib/utils/normalize-items";
 
 function tsToIso(value: unknown): string {
   if (value instanceof Timestamp) return value.toDate().toISOString();
@@ -54,7 +55,7 @@ async function getUpcomingOrders(): Promise<Order[]> {
         id: d.id,
         customerId: data.customerId,
         customerName: data.customerName,
-        items: data.items ?? [],
+        items: normalizeSaleItems(data.items),
         totalCents: data.totalCents,
         paidCents: data.paidCents,
         pendingCents: data.pendingCents,

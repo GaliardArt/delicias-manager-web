@@ -14,6 +14,7 @@ import {
 import { db } from "./config";
 import { Order } from "@/types";
 import { getAllSalesRaw, RawSale, summarizeSales, SalesSummary } from "./reports";
+import { normalizeSaleItems } from "@/lib/utils/normalize-items";
 
 function tsToIso(value: unknown): string {
   if (value instanceof Timestamp) return value.toDate().toISOString();
@@ -52,7 +53,7 @@ function mapOrderDoc(id: string, data: DocumentData): Order {
     id,
     customerId: data.customerId,
     customerName: data.customerName,
-    items: data.items ?? [],
+    items: normalizeSaleItems(data.items),
     totalCents: data.totalCents,
     paidCents: data.paidCents,
     pendingCents: data.pendingCents,

@@ -3,6 +3,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  increment,
   orderBy,
   query,
   runTransaction,
@@ -12,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "./config";
 import { Payment, PaymentMethod, Sale, SaleItem } from "@/types";
+import { normalizeSaleItems } from "@/lib/utils/normalize-items";
 
 function tsToIso(value: unknown): string {
   if (value instanceof Timestamp) return value.toDate().toISOString();
@@ -56,6 +58,14 @@ export async function createSale(input: CreateSaleInput): Promise<string> {
     createdAt: serverTimestamp(),
     createdBy: auth.currentUser?.uid ?? null,
   });
+
+  // Baixa de estoque (seção pedida: aceitar o pedido mesmo com estoque zerado,
+  // só deixa negativo — nunca bloqueia a venda).
+  for (const item of items) {
+    batch.update(doc(db, "products", item.productId), {
+      stockQuantity: increment(-item.quantity),
+    });
+  }
 
   if (initialPaymentCents > 0) {
     const paymentRef = doc(collection(saleRef, "payments"));
@@ -131,7 +141,7 @@ export async function getSaleWithPayments(saleId: string): Promise<Sale | null> 
     id: saleSnap.id,
     customerId: data.customerId,
     customerName: data.customerName,
-    items: data.items ?? [],
+    items: normalizeSaleItems(data.items),
     totalCents: data.totalCents,
     paidCents: data.paidCents,
     pendingCents: data.pendingCents,

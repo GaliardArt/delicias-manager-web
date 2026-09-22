@@ -3,6 +3,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  increment,
   orderBy,
   query,
   runTransaction,
@@ -14,6 +15,7 @@ import {
 import { db, auth } from "./config";
 import { Order, OrderStatus, Payment, PaymentMethod, SaleItem } from "@/types";
 import { logActivity } from "./activity";
+import { normalizeSaleItems } from "@/lib/utils/normalize-items";
 
 function tsToIso(value: unknown): string {
   if (value instanceof Timestamp) return value.toDate().toISOString();
@@ -78,6 +80,14 @@ export async function createOrder(input: CreateOrderInput): Promise<string> {
     createdBy: auth.currentUser?.uid ?? null,
   });
 
+  // Baixa de estoque também para encomendas — aceita mesmo com estoque
+  // zerado, só deixa negativo.
+  for (const item of items) {
+    batch.update(doc(db, "products", item.productId), {
+      stockQuantity: increment(-item.quantity),
+    });
+  }
+
   if (initialPaymentCents > 0) {
     const paymentRef = doc(collection(orderRef, "payments"));
     batch.set(paymentRef, {
@@ -134,7 +144,7 @@ export async function listRecentOrders(max = 150): Promise<OrderListItem[]> {
       expectedDate: data.expectedDate,
       status: data.status,
       itemsCount: Array.isArray(data.items) ? data.items.length : 0,
-      items: data.items ?? [],
+      items: normalizeSaleItems(data.items),
     };
   });
 }
@@ -162,7 +172,7 @@ export async function getOrderWithPayments(orderId: string): Promise<Order | nul
     id: orderSnap.id,
     customerId: data.customerId,
     customerName: data.customerName,
-    items: data.items ?? [],
+    items: normalizeSaleItems(data.items),
     totalCents: data.totalCents,
     paidCents: data.paidCents,
     pendingCents: data.pendingCents,

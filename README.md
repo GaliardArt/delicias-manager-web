@@ -180,6 +180,53 @@ Corrigido dos dois lados:
 
 ## Ajustes pós-lançamento
 
+### Insumos, Ingredientes, Estoque, Lucro e Contas
+
+- **`/insumos`** — matérias-primas compradas (farinha, leite condensado, cacau...).
+  Você informa o preço pago e a quantidade da embalagem; o custo por unidade
+  (`unitCostCents`) é calculado automaticamente e recalculado a cada compra
+  registrada. "Registrar compra" atualiza o custo **e** soma ao estoque na mesma
+  ação; "Ajustar estoque" é pra contagem/perda manual, sem mexer no custo.
+- **`/ingredientes`** — feitos a partir de uma receita de insumos **e/ou outros
+  ingredientes** (ex: brigadeiro, que depois entra na receita de um bolo). O custo
+  por unidade nunca é digitado — é sempre resolvido ao vivo a partir da receita
+  (`src/lib/costing.ts`), inclusive recursivamente quando um ingrediente usa outro.
+  Tem proteção contra referência circular (A usa B que usa A): em vez de travar o
+  app num loop infinito, o ciclo entra com custo 0 nesse ponto.
+- **Produtos** ganharam uma receita opcional (mesmo `RecipeBuilder` reutilizado
+  pelos Ingredientes) e estoque próprio (`stockQuantity`, pode ficar negativo). A
+  tela do produto mostra Custo e Margem calculados ao vivo quando há receita
+  cadastrada; produtos sem receita mostram custo R$ 0,00 (dado real — "sem receita
+  cadastrada", não uma estimativa).
+- **Estoque integrado a Vendas e Encomendas**: toda venda (`createSale`) e
+  encomenda (`createOrder`) já baixa o estoque do produto (`increment(-quantidade)`)
+  na mesma transação atômica da criação — nunca uma operação separada que poderia
+  falhar e deixar o estoque errado. Como pedido, a baixa **nunca bloqueia** a venda
+  ou encomenda: se não tem estoque suficiente, o número simplesmente fica negativo.
+- **Custo por venda**: cada item de venda/encomenda agora grava
+  `unitCostCents` — o custo do produto (via receita) no momento exato da venda,
+  não recalculado depois. Isso preserva a precisão histórica mesmo que o preço de
+  um insumo mude no futuro (mesmo princípio de nunca alterar valores do passado,
+  seção 21). Vendas antigas, de antes dessa mudança, são lidas com custo 0 em vez
+  de quebrar (`src/lib/utils/normalize-items.ts`).
+- **Lucro bruto e líquido**: novo card "Lucro" em Relatórios — Custo (CMV), Lucro
+  Bruto (faturamento − custo), Despesas do período (via Contas) e Lucro Líquido
+  (bruto − despesas). Fica claro ali mesmo que vendas sem receita cadastrada
+  entram com custo zero, então o bruto fica superestimado até a receita ser
+  cadastrada — nada escondido.
+- **`/contas`** — CRUD simples de despesas (gasolina, compra de insumos, aluguel
+  etc.), com filtro por período e total, que alimenta o Lucro Líquido dos
+  Relatórios.
+- **Novas coleções no Firestore**: `insumos`, `ingredientes`, `expenses` — regras
+  de segurança já adicionadas ao `firestore.rules` (mesma política: exige login,
+  nada de acesso público).
+- **Navegação "Mais"**: com 11 seções agora (Dashboard, Vendas, Encomendas, Dias de
+  Venda, Clientes, Produtos, Insumos, Ingredientes, Contas, Relatórios,
+  Configurações), a barra inferior do mobile não cabia mais tudo. Ficaram fixos os
+  4 mais usados no dia a dia (Dashboard, Vendas, Encomendas, Clientes) + uma 5ª aba
+  "Mais" que abre uma grade com o resto. No desktop a sidebar já mostra tudo, sem
+  mudança.
+
 - **Venda avulsa**: checkbox "Avulso (para clientes não cadastrados)" na tela de
   Nova Venda — quando marcado, dispensa a seleção de cliente cadastrado e permite
   digitar um nome livre (ou deixar em branco, que vira "Cliente avulso"). Vendas

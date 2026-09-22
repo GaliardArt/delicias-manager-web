@@ -24,6 +24,18 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
     }
 
+    match /insumos/{insumoId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /ingredientes/{ingredienteId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /expenses/{expenseId} {
+      allow read, write: if isSignedIn();
+    }
+
     match /sales/{saleId} {
       allow read, write: if isSignedIn();
 
