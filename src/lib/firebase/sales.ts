@@ -237,8 +237,9 @@ export async function deleteSale(saleId: string): Promise<void> {
       const daysSnap = await getDocs(
         query(collection(db, "salesDays"), where("date", "==", date))
       );
-      if (!daysSnap.empty) {
-        const dayRef = daysSnap.docs[0].ref;
+      const dayDoc = daysSnap.docs[0];
+      if (dayDoc) {
+        const dayRef = dayDoc.ref;
         batch.update(dayRef, {
           expectedCents: increment(-Number(sale.totalCents ?? 0)),
           receivedCents: increment(-Number(sale.paidCents ?? 0)),

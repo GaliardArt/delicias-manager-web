@@ -245,8 +245,9 @@ export async function addOrderPayment(
     const daysSnap = await getDocs(
       query(collection(db, "salesDays"), where("date", "==", expectedDate))
     );
-    if (!daysSnap.empty) {
-      await updateDoc(daysSnap.docs[0].ref, {
+    const dayDoc = daysSnap.docs[0];
+    if (dayDoc) {
+      await updateDoc(dayDoc.ref, {
         receivedCents: increment(amountCents),
         pendingCents: increment(-amountCents),
       });
@@ -272,8 +273,9 @@ export async function deleteOrder(orderId: string): Promise<void> {
   const daysSnap = await getDocs(
     query(collection(db, "salesDays"), where("date", "==", order.expectedDate))
   );
-  if (!daysSnap.empty && order.status !== "cancelada") {
-    const dayRef = daysSnap.docs[0].ref;
+  const dayDoc = daysSnap.docs[0];
+  if (dayDoc && order.status !== "cancelada") {
+    const dayRef = dayDoc.ref;
     batch.update(dayRef, {
       expectedCents: increment(-Number(order.totalCents ?? 0)),
       receivedCents: increment(-Number(order.paidCents ?? 0)),
