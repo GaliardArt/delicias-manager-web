@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { AlertCircle, ArrowLeft, MapPin, StickyNote } from "lucide-react";
+import { AlertCircle, ArrowLeft, MapPin, StickyNote, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Select } from "@/components/ui/Select";
 import { AddOrderPaymentForm } from "@/features/orders/components/AddOrderPaymentForm";
-import { getOrderWithPayments, updateOrderStatus } from "@/lib/firebase/orders";
+import { deleteOrder, getOrderWithPayments, updateOrderStatus } from "@/lib/firebase/orders";
 import { Order, OrderStatus } from "@/types";
 import { formatCurrencyBRL, formatDateBR, formatDateTimeBR } from "@/lib/utils/format";
 import { orderStatusLabel, orderStatusTone } from "@/lib/utils/order-status";
@@ -27,9 +29,11 @@ const allStatuses: OrderStatus[] = [
 
 export default function OrderDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const [order, setOrder] = useState<Order | null | undefined>(undefined);
   const [error, setError] = useState(false);
   const [statusSaving, setStatusSaving] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   async function load() {
     setError(false);
@@ -154,6 +158,12 @@ export default function OrderDetailPage() {
             </div>
           </Card>
 
+          <div className="flex justify-end">
+            <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmOpen(true)}>
+              <Trash2 className="h-4 w-4" /> Deletar encomenda
+            </Button>
+          </div>
+
           <Card>
             <CardHeader>
               <CardTitle>Status</CardTitle>
@@ -207,6 +217,23 @@ export default function OrderDetailPage() {
             </Card>
           )}
         </div>
+      )}
+
+      {order && (
+        <ConfirmDialog
+          open={deleteConfirmOpen}
+          onClose={() => setDeleteConfirmOpen(false)}
+          title="Deletar encomenda"
+          description={`Essa ação é permanente e não pode ser desfeita. A encomenda de ${order.customerName} no valor de ${formatCurrencyBRL(
+            order.totalCents
+          )} será removida do sistema.`}
+          confirmLabel="Deletar definitivamente"
+          danger
+          onConfirm={async () => {
+            await deleteOrder(order.id);
+            router.push("/encomendas");
+          }}
+        />
       )}
     </AppShell>
   );

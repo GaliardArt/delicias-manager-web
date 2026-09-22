@@ -2,17 +2,16 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, ShoppingBag, Search, History } from "lucide-react";
+import { ArrowLeft, History, Search } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/Input";
-import { SaleStatusBadge } from "@/features/sales/components/SaleStatusBadge";
-import { listRecentSales, SaleListItem } from "@/lib/firebase/sales";
+import { listHistoricalSales, SaleListItem } from "@/lib/firebase/sales";
 import { formatCurrencyBRL, formatDateTimeBR } from "@/lib/utils/format";
+import { SaleStatusBadge } from "@/features/sales/components/SaleStatusBadge";
 
-export default function VendasPage() {
+export default function VendasHistoricoPage() {
   const [sales, setSales] = useState<SaleListItem[] | null>(null);
   const [error, setError] = useState(false);
   const [search, setSearch] = useState("");
@@ -21,8 +20,7 @@ export default function VendasPage() {
     setError(false);
     setSales(null);
     try {
-      const data = await listRecentSales();
-      setSales(data);
+      setSales(await listHistoricalSales());
     } catch (err) {
       console.error(err);
       setError(true);
@@ -33,36 +31,26 @@ export default function VendasPage() {
     load();
   }, []);
 
-  const filtered = sales?.filter((s) =>
-    s.customerName.toLowerCase().includes(search.toLowerCase())
-  );
+  const term = search.toLowerCase();
+  const filtered = sales?.filter((sale) => sale.customerName.toLowerCase().includes(term));
 
   return (
-    <AppShell title="Vendas">
-      <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="relative w-full md:max-w-xs">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
-          <Input
-            placeholder="Buscar por cliente"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <Link href="/vendas/nova" className="w-full md:w-auto">
-          <Button size="lg" className="w-full md:w-auto">
-            <Plus className="h-4 w-4" /> Nova venda
-          </Button>
-        </Link>
-      </div>
+    <AppShell title="Histórico de vendas">
+      <Link
+        href="/vendas"
+        className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted hover:text-ink"
+      >
+        <ArrowLeft className="h-4 w-4" /> Voltar para Vendas
+      </Link>
 
-      <div className="mb-4">
-        <Link
-          href="/vendas/historico"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted hover:text-ink"
-        >
-          <History className="h-3.5 w-3.5" /> Ver histórico de vendas
-        </Link>
+      <div className="relative mb-4 w-full sm:max-w-xs">
+        <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
+        <Input
+          placeholder="Buscar por cliente"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9"
+        />
       </div>
 
       {sales === null && !error && (
@@ -75,25 +63,23 @@ export default function VendasPage() {
 
       {error && (
         <EmptyState
-          icon={ShoppingBag}
-          title="Não foi possível carregar as vendas"
+          icon={History}
+          title="Não foi possível carregar o histórico"
           description="Verifique sua conexão ou as credenciais do Firebase."
           actionLabel="Tentar novamente"
           onAction={load}
         />
       )}
 
-      {sales !== null && !error && filtered?.length === 0 && (
+      {filtered && filtered.length === 0 && !error && (
         <EmptyState
-          icon={ShoppingBag}
-          title={search ? "Nenhuma venda encontrada" : "Nenhuma venda registrada ainda"}
+          icon={History}
+          title={search ? "Nenhuma venda encontrada" : "Nenhuma venda no histórico"}
           description={
             search
               ? "Tente buscar por outro nome de cliente."
-              : "Registre a primeira venda para começar a acompanhar o faturamento."
+              : "As vendas aparecem aqui quando o Dia de Venda correspondente é encerrado."
           }
-          actionLabel={search ? undefined : "+ Nova venda"}
-          onAction={search ? undefined : () => (window.location.href = "/vendas/nova")}
         />
       )}
 

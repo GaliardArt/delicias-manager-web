@@ -245,6 +245,17 @@ export async function closeDay(
   });
 
   await batch.commit();
+
+  // Vincula as vendas avulsas ao Dia de Venda recém-encerrado.
+  // O histórico também usa a data como fallback para registros antigos.
+  for (let i = 0; i < sales.length; i += 450) {
+    const salesBatch = writeBatch(db);
+    for (const sale of sales.slice(i, i + 450)) {
+      salesBatch.update(doc(db, "sales", sale.id), { salesDayId: dayRef.id });
+    }
+    if (i < sales.length) await salesBatch.commit();
+  }
+
   return dayRef.id;
 }
 

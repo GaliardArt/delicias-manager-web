@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { AlertCircle, ArrowLeft } from "lucide-react";
+import { AlertCircle, ArrowLeft, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SaleStatusBadge } from "@/features/sales/components/SaleStatusBadge";
 import { AddPaymentForm } from "@/features/sales/components/AddPaymentForm";
-import { getSaleWithPayments } from "@/lib/firebase/sales";
+import { deleteSale, getSaleWithPayments } from "@/lib/firebase/sales";
 import { Sale } from "@/types";
 import { formatCurrencyBRL, formatDateTimeBR } from "@/lib/utils/format";
 import { paymentMethodLabel } from "@/lib/utils/payment-method";
@@ -19,6 +21,7 @@ export default function SaleDetailPage() {
   const router = useRouter();
   const [sale, setSale] = useState<Sale | null | undefined>(undefined);
   const [error, setError] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   async function load() {
     setError(false);
@@ -117,6 +120,12 @@ export default function SaleDetailPage() {
             </div>
           </Card>
 
+          <div className="flex justify-end">
+            <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmOpen(true)}>
+              <Trash2 className="h-4 w-4" /> Deletar venda
+            </Button>
+          </div>
+
           <Card>
             <CardHeader>
               <CardTitle>Pagamentos</CardTitle>
@@ -149,6 +158,23 @@ export default function SaleDetailPage() {
             </Card>
           )}
         </div>
+      )}
+
+      {sale && (
+        <ConfirmDialog
+          open={deleteConfirmOpen}
+          onClose={() => setDeleteConfirmOpen(false)}
+          title="Deletar venda"
+          description={`Essa ação é permanente e não pode ser desfeita. A venda de ${sale.customerName} no valor de ${formatCurrencyBRL(
+            sale.totalCents
+          )} será removida do sistema.`}
+          confirmLabel="Deletar definitivamente"
+          danger
+          onConfirm={async () => {
+            await deleteSale(sale.id);
+            router.push("/vendas");
+          }}
+        />
       )}
     </AppShell>
   );

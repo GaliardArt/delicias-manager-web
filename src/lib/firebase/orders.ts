@@ -10,6 +10,7 @@ import {
   serverTimestamp,
   Timestamp,
   updateDoc,
+  where,
   writeBatch,
 } from "firebase/firestore";
 import { db, auth } from "./config";
@@ -197,6 +198,8 @@ export async function addOrderPayment(
     throw new Error("O valor do pagamento precisa ser maior que zero.");
   }
 
+  let expectedDate: string | undefined;
+
   await runTransaction(db, async (transaction) => {
     const orderRef = doc(db, "orders", orderId);
     const orderSnap = await transaction.get(orderRef);
@@ -204,6 +207,7 @@ export async function addOrderPayment(
       throw new Error("Encomenda não encontrada.");
     }
     const order = orderSnap.data();
+    expectedDate = order.expectedDate as string | undefined;
     const currentPaid: number = order.paidCents;
     const total: number = order.totalCents;
     const newPaid = currentPaid + amountCents;
@@ -236,6 +240,50 @@ export async function addOrderPayment(
       createdAt: serverTimestamp(),
     });
   });
+
+  if (expectedDate) {
+    const daysSnap = await getDocs(
+      query(collection(db, "salesDays"), where("date", "==", expectedDate))
+    );
+    if (!daysSnap.empty) {
+      await updateDoc(daysSnap.docs[0].ref, {
+        receivedCents: increment(amountCents),
+        pendingCents: increment(-amountCents),
+      });
+    }
+  }
+}
+
+// Exclui a encomenda e seus pagamentos. Se ela já pertence a um Dia de Venda
+// encerrado, os totais históricos daquele dia também são ajustados.
+export async function deleteOrder(orderId: string): Promise<void> {
+  const orderRef = doc(db, "orders", orderId);
+  const orderSnap = await getDoc(orderRef);
+  if (!orderSnap.exists()) throw new Error("Encomenda não encontrada.");
+
+  const order = orderSnap.data();
+  const paymentsSnap = await getDocs(collection(orderRef, "payments"));
+  const batch = writeBatch(db);
+
+  for (const payment of paymentsSnap.docs) {
+    batch.delete(payment.ref);
+  }
+
+  const daysSnap = await getDocs(
+    query(collection(db, "salesDays"), where("date", "==", order.expectedDate))
+  );
+  if (!daysSnap.empty && order.status !== "cancelada") {
+    const dayRef = daysSnap.docs[0].ref;
+    batch.update(dayRef, {
+      expectedCents: increment(-Number(order.totalCents ?? 0)),
+      receivedCents: increment(-Number(order.paidCents ?? 0)),
+      pendingCents: increment(-Number(order.pendingCents ?? 0)),
+      ordersCount: increment(-1),
+    });
+  }
+
+  batch.delete(orderRef);
+  await batch.commit();
 }
 
 // Troca de status é uma correção local segura (seção 31) — não muda dinheiro

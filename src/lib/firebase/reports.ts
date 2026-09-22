@@ -3,6 +3,7 @@ import { db } from "./config";
 import { Customer, Product } from "@/types";
 
 export interface RawSale {
+  id: string;
   customerId: string;
   customerName: string;
   totalCents: number;
@@ -31,6 +32,7 @@ export async function getAllSalesRaw(): Promise<RawSale[]> {
       data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date();
     const items = Array.isArray(data.items) ? data.items : [];
     return {
+      id: d.id,
       customerId: data.customerId,
       customerName: data.customerName,
       totalCents: data.totalCents,

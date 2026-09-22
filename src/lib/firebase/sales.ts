@@ -9,7 +9,9 @@ import {
   runTransaction,
   serverTimestamp,
   Timestamp,
+  where,
   writeBatch,
+  updateDoc,
 } from "firebase/firestore";
 import { db, auth } from "./config";
 import { Payment, PaymentMethod, Sale, SaleItem } from "@/types";
@@ -102,20 +104,68 @@ export interface SaleListItem {
 // Lista as vendas mais recentes. Filtros mais elaborados (período, forma de
 // pagamento) ficam para quando houver necessidade real de escalar (seção 28).
 export async function listRecentSales(max = 100): Promise<SaleListItem[]> {
-  const q = query(collection(db, "sales"), orderBy("createdAt", "desc"));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.slice(0, max).map((d) => {
-    const data = d.data();
-    return {
-      id: d.id,
-      customerName: data.customerName,
-      totalCents: data.totalCents,
-      paidCents: data.paidCents,
-      pendingCents: data.pendingCents,
-      createdAt: tsToIso(data.createdAt),
-      itemsCount: Array.isArray(data.items) ? data.items.length : 0,
-    };
-  });
+  const [salesSnap, closedDaysSnap] = await Promise.all([
+    getDocs(query(collection(db, "sales"), orderBy("createdAt", "desc"))),
+    getDocs(collection(db, "salesDays")),
+  ]);
+
+  const closedDates = new Set(closedDaysSnap.docs.map((d) => d.data().date as string));
+  return salesSnap.docs
+    .filter((d) => {
+      const data = d.data();
+      const createdAt = data.createdAt instanceof Timestamp ? data.createdAt.toDate() : null;
+      if (!createdAt) return true;
+      const date = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, "0")}-${String(
+        createdAt.getDate()
+      ).padStart(2, "0")}`;
+      return !closedDates.has(date);
+    })
+    .slice(0, max)
+    .map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        customerName: data.customerName,
+        totalCents: data.totalCents,
+        paidCents: data.paidCents,
+        pendingCents: data.pendingCents,
+        createdAt: tsToIso(data.createdAt),
+        itemsCount: Array.isArray(data.items) ? data.items.length : 0,
+      };
+    });
+}
+
+export async function listHistoricalSales(max = 150): Promise<SaleListItem[]> {
+  const [salesSnap, closedDaysSnap] = await Promise.all([
+    getDocs(query(collection(db, "sales"), orderBy("createdAt", "desc"))),
+    getDocs(collection(db, "salesDays")),
+  ]);
+
+  const closedDates = new Set(closedDaysSnap.docs.map((d) => d.data().date as string));
+  return salesSnap.docs
+    .filter((d) => {
+      const data = d.data();
+      if (data.salesDayId) return true;
+      const createdAt = data.createdAt instanceof Timestamp ? data.createdAt.toDate() : null;
+      if (!createdAt) return false;
+      const date = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, "0")}-${String(
+        createdAt.getDate()
+      ).padStart(2, "0")}`;
+      return closedDates.has(date);
+    })
+    .slice(0, max)
+    .map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        customerName: data.customerName,
+        totalCents: data.totalCents,
+        paidCents: data.paidCents,
+        pendingCents: data.pendingCents,
+        createdAt: tsToIso(data.createdAt),
+        itemsCount: Array.isArray(data.items) ? data.items.length : 0,
+      };
+    });
 }
 
 export async function getSaleWithPayments(saleId: string): Promise<Sale | null> {
@@ -155,11 +205,63 @@ export async function getSaleWithPayments(saleId: string): Promise<Sale | null> 
 // depois, pagamento parcial complementado, etc). Roda em transação para que
 // paidCents/pendingCents nunca fiquem inconsistentes com a soma real dos
 // pagamentos, mesmo com dois usuários registrando ao mesmo tempo.
+export async function deleteSale(saleId: string): Promise<void> {
+  const saleRef = doc(db, "sales", saleId);
+  const saleSnap = await getDoc(saleRef);
+  if (!saleSnap.exists()) throw new Error("Venda não encontrada.");
+
+  const sale = saleSnap.data();
+  const paymentsSnap = await getDocs(collection(saleRef, "payments"));
+  const batch = writeBatch(db);
+
+  for (const payment of paymentsSnap.docs) {
+    batch.delete(payment.ref);
+  }
+
+  if (sale.salesDayId) {
+    const dayRef = doc(db, "salesDays", sale.salesDayId);
+    batch.update(dayRef, {
+      expectedCents: increment(-Number(sale.totalCents ?? 0)),
+      receivedCents: increment(-Number(sale.paidCents ?? 0)),
+      pendingCents: increment(-Number(sale.pendingCents ?? 0)),
+      salesCents: increment(-Number(sale.totalCents ?? 0)),
+      salesReceivedCents: increment(-Number(sale.paidCents ?? 0)),
+      salesCount: increment(-1),
+    });
+  } else {
+    const createdAt = sale.createdAt instanceof Timestamp ? sale.createdAt.toDate() : null;
+    if (createdAt) {
+      const date = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, "0")}-${String(
+        createdAt.getDate()
+      ).padStart(2, "0")}`;
+      const daysSnap = await getDocs(
+        query(collection(db, "salesDays"), where("date", "==", date))
+      );
+      if (!daysSnap.empty) {
+        const dayRef = daysSnap.docs[0].ref;
+        batch.update(dayRef, {
+          expectedCents: increment(-Number(sale.totalCents ?? 0)),
+          receivedCents: increment(-Number(sale.paidCents ?? 0)),
+          pendingCents: increment(-Number(sale.pendingCents ?? 0)),
+          salesCents: increment(-Number(sale.totalCents ?? 0)),
+          salesReceivedCents: increment(-Number(sale.paidCents ?? 0)),
+          salesCount: increment(-1),
+        });
+      }
+    }
+  }
+
+  batch.delete(saleRef);
+  await batch.commit();
+}
+
 export async function addPayment(
   saleId: string,
   amountCents: number,
   method: PaymentMethod
 ): Promise<void> {
+  let closedSalesDayId: string | undefined;
+
   if (amountCents <= 0) {
     throw new Error("O valor do pagamento precisa ser maior que zero.");
   }
@@ -171,6 +273,7 @@ export async function addPayment(
       throw new Error("Venda não encontrada.");
     }
     const sale = saleSnap.data();
+    closedSalesDayId = sale.salesDayId as string | undefined;
     const currentPaid: number = sale.paidCents;
     const total: number = sale.totalCents;
     const newPaid = currentPaid + amountCents;
@@ -203,4 +306,12 @@ export async function addPayment(
       createdAt: serverTimestamp(),
     });
   });
+
+  if (closedSalesDayId) {
+    await updateDoc(doc(db, "salesDays", closedSalesDayId), {
+      receivedCents: increment(amountCents),
+      pendingCents: increment(-amountCents),
+      salesReceivedCents: increment(amountCents),
+    });
+  }
 }
