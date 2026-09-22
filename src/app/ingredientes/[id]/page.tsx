@@ -201,9 +201,7 @@ export default function IngredienteDetailPage() {
             open={deleteConfirmOpen}
             onClose={() => setDeleteConfirmOpen(false)}
             title="Deletar ingrediente"
-            description={
-              <>Essa ação é permanente e não pode ser desfeita. O ingrediente <strong>{ingrediente.name}</strong> será removido do sistema. Se ele estiver sendo usado em históricos ou receitas, essas referências não serão reconstruídas.</>
-            }
+            description={`Essa ação é permanente e não pode ser desfeita. O ingrediente ${ingrediente.name} será removido do sistema. Se ele estiver sendo usado em históricos ou receitas, essas referências não serão reconstruídas.`}
             confirmLabel="Deletar definitivamente"
             danger
             onConfirm={async () => {

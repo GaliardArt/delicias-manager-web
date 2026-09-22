@@ -185,9 +185,7 @@ export default function CustomerDetailPage() {
           open={deleteConfirmOpen}
           onClose={() => setDeleteConfirmOpen(false)}
           title="Deletar cliente"
-          description={
-            <>Essa ação é permanente e não pode ser desfeita. O cliente <strong>{customer.name}</strong> será removido do sistema. Se ele estiver sendo usado em históricos ou receitas, essas referências não serão reconstruídas.</>
-          }
+          description={`Essa ação é permanente e não pode ser desfeita. O cliente ${customer.name} será removido do sistema. Se ele estiver sendo usado em históricos ou receitas, essas referências não serão reconstruídas.`}
           confirmLabel="Deletar definitivamente"
           danger
           onConfirm={async () => {

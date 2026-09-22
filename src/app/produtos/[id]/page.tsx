@@ -256,9 +256,7 @@ export default function ProductDetailPage() {
             open={deleteConfirmOpen}
             onClose={() => setDeleteConfirmOpen(false)}
             title="Deletar produto"
-            description={
-              <>Essa ação é permanente e não pode ser desfeita. O produto <strong>{product.name}</strong> será removido do sistema. Se ele estiver sendo usado em históricos ou receitas, essas referências não serão reconstruídas.</>
-            }
+            description={`Essa ação é permanente e não pode ser desfeita. O produto ${product.name} será removido do sistema. Se ele estiver sendo usado em históricos ou receitas, essas referências não serão reconstruídas.`}
             confirmLabel="Deletar definitivamente"
             danger
             onConfirm={async () => {
