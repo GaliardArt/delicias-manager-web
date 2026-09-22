@@ -60,7 +60,12 @@ export default function ProductDetailPage() {
   const cost = useMemo(
     () =>
       product
-        ? resolveProductCost(product.recipeItems, toInsumosMap(insumos), toIngredientesMap(ingredientes))
+        ? resolveProductCost(
+            product.recipeItems,
+            toInsumosMap(insumos),
+            toIngredientesMap(ingredientes),
+            product.yieldQuantity
+          )
         : 0,
     [product, insumos, ingredientes]
   );
@@ -112,7 +117,13 @@ export default function ProductDetailPage() {
               <p className="mb-3 text-sm text-ink-muted">{product.description}</p>
             )}
 
-            <div className="grid grid-cols-3 gap-3 text-sm">
+            <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+              <div>
+                <p className="text-ink-muted">Rendimento</p>
+                <p className="font-display text-base font-semibold text-ink">
+                  {product.yieldQuantity} {product.unit}
+                </p>
+              </div>
               <div>
                 <p className="text-ink-muted">Estoque</p>
                 <p

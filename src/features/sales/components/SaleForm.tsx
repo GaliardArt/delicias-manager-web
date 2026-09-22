@@ -90,7 +90,8 @@ export function SaleForm() {
     const unitCostCents = resolveProductCost(
       product.recipeItems,
       toInsumosMap(insumos),
-      toIngredientesMap(ingredientes)
+      toIngredientesMap(ingredientes),
+      product.yieldQuantity
     );
 
     const newItem: SaleItem = {

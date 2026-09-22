@@ -44,6 +44,7 @@ export interface Product {
   category: string;
   priceCents: number;
   unit: string; // unidade, caixa, pacote, kg, dúzia...
+  yieldQuantity: number; // quanto a receita rende, na unidade do produto
   description?: string;
   active: boolean;
   createdAt: string;

@@ -24,6 +24,7 @@ function mapProductDoc(id: string, data: DocumentData): Product {
     category: data.category,
     priceCents: data.priceCents,
     unit: data.unit,
+    yieldQuantity: data.yieldQuantity ?? 1,
     description: data.description,
     active: data.active,
     createdAt: data.createdAt,
@@ -60,6 +61,7 @@ interface ProductInput {
   category: string;
   priceCents: number;
   unit: string;
+  yieldQuantity: number;
   description?: string;
   recipeItems: RecipeItem[];
 }

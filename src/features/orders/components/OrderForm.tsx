@@ -92,7 +92,8 @@ export function OrderForm() {
     const unitCostCents = resolveProductCost(
       product.recipeItems,
       toInsumosMap(insumos),
-      toIngredientesMap(ingredientes)
+      toIngredientesMap(ingredientes),
+      product.yieldQuantity
     );
 
     setItems((prev) => [

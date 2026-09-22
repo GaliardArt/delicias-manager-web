@@ -25,6 +25,7 @@ export function ProductForm({ product, insumos, ingredientes, onSuccess }: Produ
   const [name, setName] = useState(product?.name ?? "");
   const [category, setCategory] = useState(product?.category ?? "");
   const [unit, setUnit] = useState(product?.unit ?? "unidade");
+  const [yieldQuantity, setYieldQuantity] = useState(product?.yieldQuantity ?? 1);
   const [priceCents, setPriceCents] = useState(product?.priceCents ?? 0);
   const [description, setDescription] = useState(product?.description ?? "");
   const [recipeItems, setRecipeItems] = useState<RecipeItem[]>(product?.recipeItems ?? []);
@@ -32,8 +33,14 @@ export function ProductForm({ product, insumos, ingredientes, onSuccess }: Produ
   const [error, setError] = useState<string | null>(null);
 
   const previewCost = useMemo(
-    () => resolveProductCost(recipeItems, toInsumosMap(insumos), toIngredientesMap(ingredientes)),
-    [recipeItems, insumos, ingredientes]
+    () =>
+      resolveProductCost(
+        recipeItems,
+        toInsumosMap(insumos),
+        toIngredientesMap(ingredientes),
+        yieldQuantity
+      ),
+    [recipeItems, insumos, ingredientes, yieldQuantity]
   );
   const previewMargin = priceCents - previewCost;
   const previewMarginPct = priceCents > 0 ? (previewMargin / priceCents) * 100 : 0;
@@ -50,6 +57,10 @@ export function ProductForm({ product, insumos, ingredientes, onSuccess }: Produ
       setError("Informe um preço maior que zero.");
       return;
     }
+    if (yieldQuantity <= 0) {
+      setError("O rendimento precisa ser maior que zero.");
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -57,6 +68,7 @@ export function ProductForm({ product, insumos, ingredientes, onSuccess }: Produ
         name: name.trim(),
         category: category.trim() || "Geral",
         unit,
+        yieldQuantity,
         priceCents,
         description: description.trim(),
         recipeItems,
@@ -99,6 +111,19 @@ export function ProductForm({ product, insumos, ingredientes, onSuccess }: Produ
             </option>
           ))}
         </Select>
+      </div>
+      <div>
+        <Input
+          label="Rendimento"
+          type="number"
+          min={0}
+          step="any"
+          value={yieldQuantity}
+          onChange={(e) => setYieldQuantity(Number(e.target.value))}
+        />
+        <p className="mt-1.5 text-xs text-ink-muted">
+          Ex: essa receita rende {yieldQuantity || 0} {unit} de {name || "produto"}.
+        </p>
       </div>
       <Input
         label="Descrição (opcional)"

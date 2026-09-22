@@ -49,15 +49,17 @@ export function resolveRecipeCost(
   }, 0);
 }
 
-// Custo de um Produto final = soma dos itens da receita, sem divisão por
-// rendimento (a receita do produto já descreve o quanto entra em 1 unidade
-// vendida).
+// Custo de uma unidade do Produto final = custo total da receita dividido pelo
+// rendimento do produto. Produtos antigos sem rendimento continuam equivalentes
+// ao comportamento anterior usando rendimento 1.
 export function resolveProductCost(
   recipeItems: RecipeItem[],
   insumosById: Map<string, Insumo>,
-  ingredientesById: Map<string, Ingrediente>
+  ingredientesById: Map<string, Ingrediente>,
+  yieldQuantity = 1
 ): number {
-  return Math.round(resolveRecipeCost(recipeItems, insumosById, ingredientesById));
+  if (yieldQuantity <= 0) return 0;
+  return Math.round(resolveRecipeCost(recipeItems, insumosById, ingredientesById) / yieldQuantity);
 }
 
 export function toInsumosMap(insumos: Insumo[]): Map<string, Insumo> {
