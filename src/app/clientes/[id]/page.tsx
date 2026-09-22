@@ -164,6 +164,7 @@ export default function CustomerDetailPage() {
       </Modal>
 
       {customer && (
+        <>
         <ConfirmDialog
           open={confirmOpen}
           onClose={() => setConfirmOpen(false)}
@@ -194,6 +195,7 @@ export default function CustomerDetailPage() {
             router.push("/clientes");
           }}
         />
+        </>
       )}
     </AppShell>
   );
