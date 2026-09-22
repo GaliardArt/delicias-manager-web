@@ -5,10 +5,12 @@ import { usePathname } from "next/navigation";
 import { LayoutGrid } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { navItems } from "./nav-items";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 export function BottomNav() {
   const pathname = usePathname();
-  const items = navItems.filter((item) => item.primaryMobile);
+  const { profile, loading } = useUserProfile();
+  const items = navItems.filter((item) => item.primaryMobile && (loading || !profile || profile.role === "admin" || profile.permissions[item.href.slice(1) as keyof typeof profile.permissions]?.view === true));
   const isMoreActive = items.every((item) => !pathname.startsWith(item.href));
 
   return (
@@ -20,7 +22,7 @@ export function BottomNav() {
       style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
     >
       <ul className="grid grid-cols-5">
-        {items.map((item) => {
+        {items.slice(0, 4).map((item) => {
           const active = pathname.startsWith(item.href);
           return (
             <li key={item.href}>

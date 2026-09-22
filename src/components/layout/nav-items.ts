@@ -10,6 +10,8 @@ import {
   Receipt,
   BarChart3,
   Settings,
+  ShieldCheck,
+  UserCircle,
   LucideIcon,
 } from "lucide-react";
 
@@ -34,6 +36,8 @@ export const navItems: NavItem[] = [
   { href: "/contas", label: "Contas", icon: Receipt },
   { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
   { href: "/configuracoes", label: "Configurações", icon: Settings },
+  { href: "/perfil", label: "Perfil", icon: UserCircle },
+  { href: "/admin", label: "Painel ADM", icon: ShieldCheck },
 ];
 
 // Itens que aparecem no menu "Mais" do mobile (tudo que não está na barra

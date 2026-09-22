@@ -1,19 +1,92 @@
 rules_version = '2';
 
-// Regras de segurança do Delícias Manager.
-// O sistema pertence a uma única empresa: qualquer usuário autenticado
-// no projeto Firebase tem acesso de leitura/escrita aos dados internos,
-// mas usuários não autenticados nunca têm acesso.
-//
-// Se no futuro o sistema precisar suportar múltiplas empresas/tenants,
-// isso exige uma mudança de arquitetura (ver seção 31 da especificação
-// original: deve ser discutido e aprovado antes de implementar).
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
     function isSignedIn() {
       return request.auth != null;
+    }
+
+    function isBootstrapAdmin() {
+      return isSignedIn()
+        && request.auth.token.email != null
+        && request.auth.token.email.lower() == "adm@adm.com";
+    }
+
+    function hasAdminProfile() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/userProfiles/$(request.auth.uid))
+        && get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.role == "admin"
+        && get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.active == true;
+    }
+
+    function isAdmin() {
+      return isBootstrapAdmin() || hasAdminProfile();
+    }
+
+    function pendingPath() {
+      return /databases/$(database)/documents/pendingUserAccess/$(request.auth.token.email.lower());
+    }
+
+    match /userProfiles/{userId} {
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
+
+      allow create: if isAdmin()
+        || (
+          isSignedIn()
+          && request.auth.uid == userId
+          && request.resource.data.uid == userId
+          && request.resource.data.email == request.auth.token.email.lower()
+          && (
+            (
+              !exists(pendingPath())
+              && request.resource.data.role == "user"
+              && request.resource.data.active == true
+              && request.resource.data.keys().hasOnly([
+                "uid", "email", "name", "cargo", "role", "active", "createdAt", "updatedAt"
+              ])
+            )
+            || (
+              exists(pendingPath())
+              && request.resource.data.role == get(pendingPath()).data.role
+              && request.resource.data.active == get(pendingPath()).data.active
+              && request.resource.data.name == get(pendingPath()).data.name
+              && request.resource.data.cargo == get(pendingPath()).data.cargo
+              && request.resource.data.permissions == get(pendingPath()).data.permissions
+              && request.resource.data.keys().hasOnly([
+                "uid", "email", "name", "cargo", "role", "active", "permissions", "createdAt", "updatedAt"
+              ])
+            )
+          )
+        );
+
+      allow update: if (
+          isAdmin()
+          && (
+            resource.data.email.lower() != "adm@adm.com"
+            || (request.resource.data.role == "admin" && request.resource.data.active == true)
+          )
+        )
+        || (
+          isSignedIn()
+          && request.auth.uid == userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "name", "cargo", "photoUrl", "updatedAt"
+          ])
+        );
+
+      allow delete: if isAdmin()
+        && resource.data.email.lower() != "adm@adm.com";
+    }
+
+    match /pendingUserAccess/{accessId} {
+      allow read: if isAdmin()
+        || (
+          isSignedIn()
+          && resource.data.email.lower() == request.auth.token.email.lower()
+        );
+      allow create, update, delete: if isAdmin();
+      allow delete: if isSignedIn()
+        && resource.data.email.lower() == request.auth.token.email.lower();
     }
 
     match /customers/{customerId} {
@@ -38,7 +111,6 @@ service cloud.firestore {
 
     match /sales/{saleId} {
       allow read, write: if isSignedIn();
-
       match /payments/{paymentId} {
         allow read, write: if isSignedIn();
       }
@@ -46,7 +118,6 @@ service cloud.firestore {
 
     match /orders/{orderId} {
       allow read, write: if isSignedIn();
-
       match /payments/{paymentId} {
         allow read, write: if isSignedIn();
       }
@@ -57,13 +128,11 @@ service cloud.firestore {
     }
 
     match /activityHistory/{eventId} {
-      // Histórico de auditoria: pode ser criado por qualquer usuário autenticado,
-      // mas nunca alterado ou apagado (trilha de auditoria confiável).
       allow read, create: if isSignedIn();
-      allow update, delete: if false;
+      allow update: if false;
+      allow delete: if isAdmin();
     }
 
-    // Qualquer coleção não listada explicitamente é negada por padrão.
     match /{document=**} {
       allow read, write: if false;
     }

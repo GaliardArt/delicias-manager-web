@@ -6,10 +6,12 @@ import { LogOut } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { navItems } from "./nav-items";
 import { signOut } from "@/lib/firebase/auth";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const { profile, loading } = useUserProfile();
   const settingsItem = navItems.find((item) => item.href === "/configuracoes")!;
   const SettingsIcon = settingsItem.icon;
 
@@ -17,6 +19,14 @@ export function Sidebar() {
     await signOut();
     router.push("/login");
   }
+
+  const visibleItems = loading || !profile
+    ? navItems.filter((item) => item.href === "/dashboard")
+    : navItems.filter((item) => {
+        if (item.href === "/perfil") return true;
+        if (item.href === "/admin") return profile.role === "admin";
+        return profile.role === "admin" || profile.permissions[item.href.slice(1) as keyof typeof profile.permissions]?.view === true;
+      });
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-line bg-surface px-4 py-6 md:flex">
@@ -28,7 +38,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex flex-1 flex-col gap-1">
-        {navItems
+        {visibleItems
           .filter((item) => item.href !== "/configuracoes")
           .map((item) => {
             const active = pathname.startsWith(item.href);
