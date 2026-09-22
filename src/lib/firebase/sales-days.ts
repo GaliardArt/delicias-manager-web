@@ -7,6 +7,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
   Timestamp,
   where,
   writeBatch,
@@ -43,7 +44,7 @@ function dateKey(d: Date): string {
 export interface SalesDayDoc {
   id: string;
   date: string; // YYYY-MM-DD
-  closed: boolean; // sempre true — só existe documento depois do fechamento
+  closed: boolean; // false enquanto o dia estiver aberto; true após o fechamento
   createdAt: string;
   // Totais combinados (encomendas do dia + vendas avulsas feitas no dia)
   expectedCents: number;
@@ -136,11 +137,52 @@ export interface OpenDayGroup {
   totalCents: number;
 }
 
-// Dias de Venda "automáticos": nenhum documento é criado até o fechamento.
-// Agrupa por data tanto as encomendas ativas (por data prevista de entrega)
-// quanto as vendas do dia (por data da venda) — uma venda de balcão feita hoje
-// entra no valor de "hoje" do mesmo jeito que uma encomenda prevista para hoje.
-// Pula datas que já têm um fechamento gravado.
+/**
+ * Garante que exista um documento para o Dia de Venda enquanto ele estiver aberto.
+ * O documento usa a própria data como ID para ser determinístico.
+ *
+ * Fechamentos antigos podem ter IDs aleatórios; por isso primeiro procuramos
+ * pelo campo `date` para respeitar esse histórico.
+ */
+export async function ensureOpenSalesDay(date: string): Promise<string> {
+  const existingSnap = await getDocs(
+    query(collection(db, "salesDays"), where("date", "==", date))
+  );
+
+  const closedDay = existingSnap.docs.find((d) => d.data().closed === true);
+  if (closedDay) {
+    throw new Error("O Dia de Venda dessa data já foi encerrado.");
+  }
+
+  const openDay = existingSnap.docs.find((d) => d.data().closed !== true);
+  if (openDay) return openDay.id;
+
+  const dayRef = doc(db, "salesDays", date);
+  await setDoc(
+    dayRef,
+    {
+      date,
+      closed: false,
+      createdAt: serverTimestamp(),
+      expectedCents: 0,
+      receivedCents: 0,
+      pendingCents: 0,
+      cancelledCents: 0,
+      notRealizedCents: 0,
+      ordersCount: 0,
+      salesCents: 0,
+      salesReceivedCents: 0,
+      salesCount: 0,
+    },
+    { merge: true }
+  );
+  return dayRef.id;
+}
+
+// Dias de Venda são criados como documentos abertos quando surge uma encomenda
+// ou venda e seus dados operacionais continuam sendo calculados ao vivo aqui.
+// Agrupa por data tanto as encomendas (por data prevista de entrega) quanto as
+// vendas do dia (por data da venda). Datas já encerradas ficam fora da lista aberta.
 export async function getOpenDayGroups(): Promise<OpenDayGroup[]> {
   const [closedDaysSnap, ordersSnap, allSales] = await Promise.all([
     getDocs(collection(db, "salesDays")),
@@ -148,7 +190,14 @@ export async function getOpenDayGroups(): Promise<OpenDayGroup[]> {
     getAllSalesRaw(),
   ]);
 
-  const closedDates = new Set(closedDaysSnap.docs.map((d) => d.data().date as string));
+  // Só um Dia de Venda explicitamente encerrado bloqueia a data.
+  // Documentos abertos existem apenas para representar que o dia foi criado,
+  // mas continuam aparecendo na área de Dias de Venda.
+  const closedDates = new Set(
+    closedDaysSnap.docs
+      .filter((d) => d.data().closed === true)
+      .map((d) => d.data().date as string)
+  );
   const orderGroups = new Map<string, Order[]>();
   const salesGroups = new Map<string, RawSale[]>();
 
@@ -216,8 +265,20 @@ export async function closeDay(
   const ordersSummary = summarizeOrders(orders);
   const salesSummary: SalesSummary = summarizeSales(sales);
 
+  const existingSnap = await getDocs(
+    query(collection(db, "salesDays"), where("date", "==", date))
+  );
+  const closedDay = existingSnap.docs.find((d) => d.data().closed === true);
+  if (closedDay) {
+    throw new Error("Este Dia de Venda já foi encerrado.");
+  }
+
+  const openDay = existingSnap.docs.find((d) => d.data().closed !== true);
+  const dayRef = openDay
+    ? openDay.ref
+    : doc(db, "salesDays", date);
+
   const batch = writeBatch(db);
-  const dayRef = doc(collection(db, "salesDays"));
 
   batch.set(dayRef, {
     date,
@@ -262,11 +323,13 @@ export async function closeDay(
 export async function listClosedDays(): Promise<SalesDayDoc[]> {
   const q = query(collection(db, "salesDays"), orderBy("date", "desc"));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({
+  return snapshot.docs
+    .filter((d) => d.data().closed === true)
+    .map((d) => ({
     id: d.id,
     ...(d.data() as Omit<SalesDayDoc, "id" | "createdAt">),
     createdAt: tsToIso(d.data().createdAt),
-  }));
+    }));
 }
 
 // Detalhe de um dia já fechado — busca as encomendas daquela data (aqui sim
@@ -277,7 +340,7 @@ export async function getClosedDayWithOrders(
   dayId: string
 ): Promise<{ day: SalesDayDoc; orders: Order[] } | null> {
   const daySnap = await getDoc(doc(db, "salesDays", dayId));
-  if (!daySnap.exists()) return null;
+  if (!daySnap.exists() || daySnap.data().closed !== true) return null;
   const day = {
     id: daySnap.id,
     ...(daySnap.data() as Omit<SalesDayDoc, "id" | "createdAt">),

@@ -16,6 +16,8 @@ import {
 import { db, auth } from "./config";
 import { Payment, PaymentMethod, Sale, SaleItem } from "@/types";
 import { normalizeSaleItems } from "@/lib/utils/normalize-items";
+import { ensureOpenSalesDay } from "./sales-days";
+import { todayLocalIso } from "@/lib/utils/format";
 
 function tsToIso(value: unknown): string {
   if (value instanceof Timestamp) return value.toDate().toISOString();
@@ -45,6 +47,8 @@ export async function createSale(input: CreateSaleInput): Promise<string> {
   if (initialPaymentCents > totalCents) {
     throw new Error("O valor pago não pode ser maior que o total da venda.");
   }
+
+  await ensureOpenSalesDay(todayLocalIso());
 
   const batch = writeBatch(db);
   const saleRef = doc(collection(db, "sales"));
@@ -109,7 +113,11 @@ export async function listRecentSales(max = 100): Promise<SaleListItem[]> {
     getDocs(collection(db, "salesDays")),
   ]);
 
-  const closedDates = new Set(closedDaysSnap.docs.map((d) => d.data().date as string));
+  const closedDates = new Set(
+    closedDaysSnap.docs
+      .filter((d) => d.data().closed === true)
+      .map((d) => d.data().date as string)
+  );
   return salesSnap.docs
     .filter((d) => {
       const data = d.data();
@@ -141,11 +149,20 @@ export async function listHistoricalSales(max = 150): Promise<SaleListItem[]> {
     getDocs(collection(db, "salesDays")),
   ]);
 
-  const closedDates = new Set(closedDaysSnap.docs.map((d) => d.data().date as string));
+  const closedDayIds = new Set(
+    closedDaysSnap.docs
+      .filter((d) => d.data().closed === true)
+      .map((d) => d.id)
+  );
+  const closedDates = new Set(
+    closedDaysSnap.docs
+      .filter((d) => d.data().closed === true)
+      .map((d) => d.data().date as string)
+  );
   return salesSnap.docs
     .filter((d) => {
       const data = d.data();
-      if (data.salesDayId) return true;
+      if (data.salesDayId) return closedDayIds.has(data.salesDayId);
       const createdAt = data.createdAt instanceof Timestamp ? data.createdAt.toDate() : null;
       if (!createdAt) return false;
       const date = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, "0")}-${String(

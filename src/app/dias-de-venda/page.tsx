@@ -34,8 +34,8 @@ export default function DiasDeVendaPage() {
   return (
     <AppShell title="Dias de Venda">
       <p className="mb-4 text-sm text-ink-muted">
-        Gerado automaticamente a partir das datas de entrega das encomendas — um
-        lembrete do que precisa ser vendido em cada dia.
+        Gerado automaticamente a partir das encomendas e vendas registradas — um
+        resumo do que está previsto ou já foi vendido em cada dia.
       </p>
 
       <div className="mb-4">
@@ -69,7 +69,7 @@ export default function DiasDeVendaPage() {
         <EmptyState
           icon={CalendarDays}
           title="Nenhum Dia de Venda em aberto"
-          description="Assim que uma encomenda tiver uma data de entrega prevista, o dia aparece aqui automaticamente."
+          description="Assim que houver uma encomenda ou venda para uma data, o dia aparece aqui automaticamente."
         />
       )}
 

@@ -92,14 +92,6 @@ export default function FecharDiaDeVendaPage() {
       setOrders(updatedOrders);
       setDecisions(newDecisions);
       setPendingOrderId(null);
-
-      // Só fecha sozinho quando existe algo pra decidir e tudo já foi marcado —
-      // um dia sem nenhuma encomenda não fecha na hora sem querer.
-      const allDecided =
-        updatedOrders.length > 0 && updatedOrders.every((o) => newDecisions[o.id]);
-      if (allDecided) {
-        await finishClosing(updatedOrders);
-      }
     } catch (err) {
       console.error(err);
       setPendingOrderId(null);
@@ -161,7 +153,7 @@ export default function FecharDiaDeVendaPage() {
               <p className="text-sm text-ink-muted">
                 Marque cada encomenda como <strong>Pago</strong> (registra o pagamento
                 do valor pendente agora) ou <strong>Falta pagar</strong> (fica como
-                fiado). Quando todas estiverem marcadas, o dia se encerra sozinho.
+                fiado). Depois que todas estiverem marcadas, use o botão abaixo para encerrar o dia.
               </p>
             ) : (
               <p className="text-sm text-ink-muted">
@@ -281,6 +273,24 @@ export default function FecharDiaDeVendaPage() {
                 );
               })}
             </div>
+          )}
+
+          {orders.length > 0 && (
+            <Button
+              size="lg"
+              className="w-full"
+              loading={closing}
+              disabled={decidedCount !== orders.length}
+              onClick={() => finishClosing(orders)}
+            >
+              <ShoppingBag className="h-4 w-4" /> Fechar dia
+            </Button>
+          )}
+
+          {orders.length > 0 && decidedCount !== orders.length && (
+            <p className="text-center text-xs text-ink-muted">
+              Marque todas as encomendas como Pago ou Falta pagar antes de fechar o dia.
+            </p>
           )}
 
           {orders.length === 0 && sales.length > 0 && (

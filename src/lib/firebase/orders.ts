@@ -18,6 +18,7 @@ import { Order, OrderStatus, Payment, PaymentMethod, SaleItem } from "@/types";
 import { logActivity } from "./activity";
 import { normalizeSaleItems } from "@/lib/utils/normalize-items";
 import { todayLocalIso } from "@/lib/utils/format";
+import { ensureOpenSalesDay } from "./sales-days";
 
 function tsToIso(value: unknown): string {
   if (value instanceof Timestamp) return value.toDate().toISOString();
@@ -60,6 +61,8 @@ export async function createOrder(input: CreateOrderInput): Promise<string> {
   if (initialPaymentCents > totalCents) {
     throw new Error("O valor pago não pode ser maior que o total da encomenda.");
   }
+
+  await ensureOpenSalesDay(expectedDate);
 
   const batch = writeBatch(db);
   const orderRef = doc(collection(db, "orders"));
