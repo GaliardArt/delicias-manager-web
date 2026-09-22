@@ -1,6 +1,7 @@
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -90,6 +91,10 @@ export async function updateIngrediente(
 ): Promise<void> {
   const unitCostCents = computeCost(input, insumos, existingIngredientes, id);
   await updateDoc(doc(db, "ingredientes", id), { ...input, unitCostCents });
+}
+
+export async function deleteIngrediente(id: string): Promise<void> {
+  await deleteDoc(doc(db, "ingredientes", id));
 }
 
 export async function setIngredienteActive(id: string, active: boolean): Promise<void> {

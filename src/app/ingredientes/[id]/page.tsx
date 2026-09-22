@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { AlertCircle, ArrowLeft, Pencil, Power, Boxes } from "lucide-react";
+import { AlertCircle, ArrowLeft, Pencil, Power, Boxes, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -16,6 +16,7 @@ import { IngredienteForm } from "@/features/ingredientes/components/IngredienteF
 import {
   getIngrediente,
   setIngredienteActive,
+  deleteIngrediente,
   adjustIngredienteStock,
   listAllIngredientes,
 } from "@/lib/firebase/ingredientes";
@@ -25,12 +26,14 @@ import { formatCurrencyBRL } from "@/lib/utils/format";
 
 export default function IngredienteDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const [ingrediente, setIngrediente] = useState<Ingrediente | null | undefined>(undefined);
   const [insumos, setInsumos] = useState<Insumo[]>([]);
   const [allIngredientes, setAllIngredientes] = useState<Ingrediente[]>([]);
   const [error, setError] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [stockOpen, setStockOpen] = useState(false);
 
   async function load() {
@@ -124,6 +127,9 @@ export default function IngredienteDetailPage() {
               <Button variant="ghost" size="sm" onClick={() => setConfirmOpen(true)}>
                 <Power className="h-4 w-4" /> {ingrediente.active ? "Desativar" : "Reativar"}
               </Button>
+              <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmOpen(true)}>
+                <Trash2 className="h-4 w-4" /> Deletar
+              </Button>
             </div>
           </Card>
 
@@ -189,6 +195,20 @@ export default function IngredienteDetailPage() {
             onConfirm={async () => {
               await setIngredienteActive(ingrediente.id, !ingrediente.active);
               load();
+            }}
+          />
+          <ConfirmDialog
+            open={deleteConfirmOpen}
+            onClose={() => setDeleteConfirmOpen(false)}
+            title="Deletar ingrediente"
+            description={
+              <>Essa ação é permanente e não pode ser desfeita. O ingrediente <strong>{ingrediente.name}</strong> será removido do sistema. Se ele estiver sendo usado em históricos ou receitas, essas referências não serão reconstruídas.</>
+            }
+            confirmLabel="Deletar definitivamente"
+            danger
+            onConfirm={async () => {
+              await deleteIngrediente(ingrediente.id);
+              router.push("/ingredientes");
             }}
           />
         </>

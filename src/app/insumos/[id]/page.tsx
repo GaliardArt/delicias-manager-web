@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { AlertCircle, ArrowLeft, Pencil, Power, Boxes, ShoppingCart } from "lucide-react";
+import { AlertCircle, ArrowLeft, Pencil, Power, Boxes, ShoppingCart, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -14,17 +14,19 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { StockAdjustDialog } from "@/components/ui/StockAdjustDialog";
 import { InsumoForm } from "@/features/insumos/components/InsumoForm";
 import { RegisterPurchaseForm } from "@/features/insumos/components/RegisterPurchaseForm";
-import { getInsumo, setInsumoActive, adjustInsumoStock } from "@/lib/firebase/insumos";
+import { getInsumo, setInsumoActive, deleteInsumo, adjustInsumoStock } from "@/lib/firebase/insumos";
 import { Insumo } from "@/types";
 import { formatCurrencyBRL } from "@/lib/utils/format";
 
 export default function InsumoDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const [insumo, setInsumo] = useState<Insumo | null | undefined>(undefined);
   const [error, setError] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [purchaseOpen, setPurchaseOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [stockOpen, setStockOpen] = useState(false);
 
   async function load() {
@@ -112,6 +114,9 @@ export default function InsumoDetailPage() {
             <Button variant="ghost" size="sm" onClick={() => setConfirmOpen(true)}>
               <Power className="h-4 w-4" /> {insumo.active ? "Desativar" : "Reativar"}
             </Button>
+              <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmOpen(true)}>
+                <Trash2 className="h-4 w-4" /> Deletar
+              </Button>
           </div>
         </Card>
       )}
@@ -158,6 +163,20 @@ export default function InsumoDetailPage() {
             onConfirm={async () => {
               await setInsumoActive(insumo.id, !insumo.active);
               load();
+            }}
+          />
+          <ConfirmDialog
+            open={deleteConfirmOpen}
+            onClose={() => setDeleteConfirmOpen(false)}
+            title="Deletar insumo"
+            description={
+              <>Essa ação é permanente e não pode ser desfeita. O insumo <strong>{insumo.name}</strong> será removido do sistema. Se ele estiver sendo usado em históricos ou receitas, essas referências não serão reconstruídas.</>
+            }
+            confirmLabel="Deletar definitivamente"
+            danger
+            onConfirm={async () => {
+              await deleteInsumo(insumo.id);
+              router.push("/insumos");
             }}
           />
         </>

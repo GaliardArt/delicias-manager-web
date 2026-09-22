@@ -1,6 +1,7 @@
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -84,6 +85,10 @@ export async function updateInsumo(id: string, input: InsumoInput): Promise<void
     packageQuantity: packageUnit && packageQuantity && packageQuantity > 0 ? packageQuantity : null,
     unitCostCents: computeUnitCostCents(input.purchasePriceCents, input.purchaseQuantity),
   });
+}
+
+export async function deleteInsumo(id: string): Promise<void> {
+  await deleteDoc(doc(db, "insumos", id));
 }
 
 export async function setInsumoActive(id: string, active: boolean): Promise<void> {

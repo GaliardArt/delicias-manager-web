@@ -1,6 +1,7 @@
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   DocumentData,
   getDoc,
@@ -78,6 +79,10 @@ export async function createProduct(input: ProductInput): Promise<string> {
 
 export async function updateProduct(id: string, input: ProductInput): Promise<void> {
   await updateDoc(doc(db, "products", id), { ...input });
+}
+
+export async function deleteProduct(id: string): Promise<void> {
+  await deleteDoc(doc(db, "products", id));
 }
 
 export async function setProductActive(id: string, active: boolean): Promise<void> {

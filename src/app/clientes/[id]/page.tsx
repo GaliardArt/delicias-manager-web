@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { AlertCircle, ArrowLeft, Pencil, Power } from "lucide-react";
+import { AlertCircle, ArrowLeft, Pencil, Power, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -12,18 +12,20 @@ import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { CustomerForm } from "@/features/customers/components/CustomerForm";
-import { getCustomer, setCustomerActive } from "@/lib/firebase/customers";
+import { getCustomer, setCustomerActive, deleteCustomer } from "@/lib/firebase/customers";
 import { getCustomerStats, CustomerStats } from "@/lib/firebase/stats";
 import { Customer } from "@/types";
 import { formatCurrencyBRL, formatDateBR, formatPhoneBR } from "@/lib/utils/format";
 
 export default function CustomerDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const [customer, setCustomer] = useState<Customer | null | undefined>(undefined);
   const [stats, setStats] = useState<CustomerStats | null>(null);
   const [error, setError] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   async function load() {
     setError(false);
@@ -96,6 +98,9 @@ export default function CustomerDetailPage() {
               </Button>
               <Button variant="ghost" size="sm" onClick={() => setConfirmOpen(true)}>
                 <Power className="h-4 w-4" /> {customer.active ? "Desativar" : "Reativar"}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmOpen(true)}>
+                <Trash2 className="h-4 w-4" /> Deletar
               </Button>
             </div>
           </Card>
@@ -173,6 +178,20 @@ export default function CustomerDetailPage() {
           onConfirm={async () => {
             await setCustomerActive(customer.id, !customer.active);
             load();
+          }}
+        />
+        <ConfirmDialog
+          open={deleteConfirmOpen}
+          onClose={() => setDeleteConfirmOpen(false)}
+          title="Deletar cliente"
+          description={
+            <>Essa ação é permanente e não pode ser desfeita. O cliente <strong>{customer.name}</strong> será removido do sistema. Se ele estiver sendo usado em históricos ou receitas, essas referências não serão reconstruídas.</>
+          }
+          confirmLabel="Deletar definitivamente"
+          danger
+          onConfirm={async () => {
+            await deleteCustomer(customer.id);
+            router.push("/clientes");
           }}
         />
       )}

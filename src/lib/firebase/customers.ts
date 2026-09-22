@@ -1,6 +1,7 @@
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -57,6 +58,10 @@ export async function createCustomer(input: CustomerInput): Promise<string> {
 
 export async function updateCustomer(id: string, input: CustomerInput): Promise<void> {
   await updateDoc(doc(db, "customers", id), { ...input });
+}
+
+export async function deleteCustomer(id: string): Promise<void> {
+  await deleteDoc(doc(db, "customers", id));
 }
 
 export async function setCustomerActive(id: string, active: boolean): Promise<void> {
