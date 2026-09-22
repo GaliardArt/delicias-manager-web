@@ -32,8 +32,10 @@ export interface RecipeItem {
   sourceType: "insumo" | "ingrediente";
   sourceId: string;
   sourceName: string;
-  quantity: number; // na unidade do insumo/ingrediente referenciado
-  unit: string;
+  quantity: number; // sempre na unidade-base do insumo/ingrediente (unit/yieldUnit) — usada no cálculo de custo
+  unit: string; // unidade-base do insumo/ingrediente referenciado
+  enteredQuantity?: number; // quantidade como o usuário digitou originalmente (pode estar em outra unidade)
+  enteredUnit?: string; // unidade escolhida pelo usuário ao montar a receita (ex: "g" para um insumo cuja base é "kg")
 }
 
 export interface Product {
@@ -60,6 +62,13 @@ export interface Insumo {
   stockQuantity: number;
   active: boolean;
   createdAt: string;
+  // Conversão personalizada opcional, para quando `unit` é uma embalagem de
+  // tamanho variável (ex: "caixa", "pacote") e a receita precisa referenciar
+  // uma unidade menor (normalmente "unidade") — ex: packageUnit="unidade",
+  // packageQuantity=30 significa "1 caixa = 30 unidades". Sem isso, só é
+  // possível lançar a quantidade na receita na própria unidade-base.
+  packageUnit?: string;
+  packageQuantity?: number;
 }
 
 // Ingrediente = feito a partir de uma receita de insumos e/ou outros

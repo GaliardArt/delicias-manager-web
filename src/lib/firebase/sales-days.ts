@@ -15,18 +15,29 @@ import { db } from "./config";
 import { Order } from "@/types";
 import { getAllSalesRaw, RawSale, summarizeSales, SalesSummary } from "./reports";
 import { normalizeSaleItems } from "@/lib/utils/normalize-items";
+import { todayLocalIso } from "@/lib/utils/format";
 
 function tsToIso(value: unknown): string {
   if (value instanceof Timestamp) return value.toDate().toISOString();
   return new Date().toISOString();
 }
 
+// Mantido como `todayIso` (nome usado por quem importa daqui) mas agora
+// delega para `todayLocalIso`, que usa o fuso horário local em vez de UTC
+// (ver nota em src/lib/utils/format.ts) — evita que "hoje" vire "amanhã"
+// no fim da noite.
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayLocalIso();
 }
 
+// Agrupa uma venda pelo dia LOCAL em que ela ocorreu, não pelo dia em UTC —
+// mesmo motivo do `todayIso` acima. Sem isso, uma venda feita à noite podia
+// ser agrupada no dia seguinte em "Dias de Venda".
 function dateKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 export interface SalesDayDoc {

@@ -13,11 +13,7 @@ import { ExpenseForm } from "@/features/expenses/components/ExpenseForm";
 import { listAllExpenses, deleteExpense } from "@/lib/firebase/expenses";
 import { getPeriodPreset, getCustomPeriod, PeriodKey } from "@/lib/firebase/reports";
 import { Expense } from "@/types";
-import { formatCurrencyBRL, formatDateBR } from "@/lib/utils/format";
-
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import { formatCurrencyBRL, formatDateBR, todayLocalIso } from "@/lib/utils/format";
 
 export default function ContasPage() {
   const [expenses, setExpenses] = useState<Expense[] | null>(null);
@@ -26,8 +22,8 @@ export default function ContasPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [periodKey, setPeriodKey] = useState<PeriodKey>("mes");
-  const [customStart, setCustomStart] = useState(todayIso());
-  const [customEnd, setCustomEnd] = useState(todayIso());
+  const [customStart, setCustomStart] = useState(todayLocalIso());
+  const [customEnd, setCustomEnd] = useState(todayLocalIso());
 
   async function load() {
     setError(false);

@@ -39,6 +39,8 @@ interface InsumoInput {
   unit: string;
   purchasePriceCents: number;
   purchaseQuantity: number;
+  packageUnit?: string;
+  packageQuantity?: number;
 }
 
 function computeUnitCostCents(purchasePriceCents: number, purchaseQuantity: number): number {
@@ -46,9 +48,21 @@ function computeUnitCostCents(purchasePriceCents: number, purchaseQuantity: numb
   return purchasePriceCents / purchaseQuantity;
 }
 
+// Firestore rejeita campos com valor `undefined` — quando a conversão
+// personalizada não é usada, esses campos simplesmente não são gravados
+// (em vez de gravar `null`/`undefined`).
+function packageFields(input: InsumoInput): Record<string, string | number> {
+  if (input.packageUnit && input.packageQuantity && input.packageQuantity > 0) {
+    return { packageUnit: input.packageUnit, packageQuantity: input.packageQuantity };
+  }
+  return {};
+}
+
 export async function createInsumo(input: InsumoInput): Promise<string> {
+  const { packageUnit, packageQuantity, ...rest } = input;
   const ref = await addDoc(collection(db, "insumos"), {
-    ...input,
+    ...rest,
+    ...packageFields(input),
     unitCostCents: computeUnitCostCents(input.purchasePriceCents, input.purchaseQuantity),
     stockQuantity: 0,
     active: true,
@@ -60,8 +74,14 @@ export async function createInsumo(input: InsumoInput): Promise<string> {
 // Edita nome/unidade/preço-base, sem mexer no estoque (isso é via
 // registerPurchase ou adjustStock). Recalcula o custo por unidade.
 export async function updateInsumo(id: string, input: InsumoInput): Promise<void> {
+  const { packageUnit, packageQuantity, ...rest } = input;
   await updateDoc(doc(db, "insumos", id), {
-    ...input,
+    ...rest,
+    // Se o usuário removeu a conversão personalizada, `deleteField()` limparia
+    // de vez; como packageFields() já omite quando não usada, usamos objeto
+    // vazio explícito para os dois campos ficarem consistentes no update.
+    packageUnit: packageUnit && packageQuantity && packageQuantity > 0 ? packageUnit : null,
+    packageQuantity: packageUnit && packageQuantity && packageQuantity > 0 ? packageQuantity : null,
     unitCostCents: computeUnitCostCents(input.purchasePriceCents, input.purchaseQuantity),
   });
 }

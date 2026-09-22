@@ -38,11 +38,7 @@ import {
   PeriodKey,
 } from "@/lib/firebase/reports";
 import { Product, Customer, Expense } from "@/types";
-import { formatCurrencyBRL, formatDateBR } from "@/lib/utils/format";
-
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import { formatCurrencyBRL, formatDateBR, todayLocalIso } from "@/lib/utils/format";
 
 export default function RelatoriosPage() {
   const [sales, setSales] = useState<RawSale[] | null>(null);
@@ -52,8 +48,8 @@ export default function RelatoriosPage() {
   const [error, setError] = useState(false);
 
   const [periodKey, setPeriodKey] = useState<PeriodKey>("semana");
-  const [customStart, setCustomStart] = useState(todayIso());
-  const [customEnd, setCustomEnd] = useState(todayIso());
+  const [customStart, setCustomStart] = useState(todayLocalIso());
+  const [customEnd, setCustomEnd] = useState(todayLocalIso());
   const [copied, setCopied] = useState(false);
 
   async function load() {

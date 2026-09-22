@@ -16,6 +16,7 @@ import { db, auth } from "./config";
 import { Order, OrderStatus, Payment, PaymentMethod, SaleItem } from "@/types";
 import { logActivity } from "./activity";
 import { normalizeSaleItems } from "@/lib/utils/normalize-items";
+import { todayLocalIso } from "@/lib/utils/format";
 
 function tsToIso(value: unknown): string {
   if (value instanceof Timestamp) return value.toDate().toISOString();
@@ -62,7 +63,7 @@ export async function createOrder(input: CreateOrderInput): Promise<string> {
   const batch = writeBatch(db);
   const orderRef = doc(collection(db, "orders"));
   const pendingCents = totalCents - initialPaymentCents;
-  const orderDate = new Date().toISOString().slice(0, 10);
+  const orderDate = todayLocalIso();
 
   batch.set(orderRef, {
     customerId,

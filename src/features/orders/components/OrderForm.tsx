@@ -16,17 +16,11 @@ import { listActiveInsumos } from "@/lib/firebase/insumos";
 import { listActiveIngredientes } from "@/lib/firebase/ingredientes";
 import { createOrder } from "@/lib/firebase/orders";
 import { resolveProductCost, toInsumosMap, toIngredientesMap } from "@/lib/costing";
-import { formatCurrencyBRL } from "@/lib/utils/format";
+import { formatCurrencyBRL, localIsoPlusDays } from "@/lib/utils/format";
 import { paymentMethodOptions } from "@/lib/utils/payment-method";
 import { orderStatusLabel } from "@/lib/utils/order-status";
 
 const statusOptions: OrderStatus[] = ["pendente", "confirmada", "em_producao", "pronta"];
-
-function todayPlusDays(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
 
 export function OrderForm() {
   const router = useRouter();
@@ -39,7 +33,7 @@ export function OrderForm() {
 
   const [customerId, setCustomerId] = useState("");
   const [items, setItems] = useState<SaleItem[]>([]);
-  const [expectedDate, setExpectedDate] = useState(todayPlusDays(3));
+  const [expectedDate, setExpectedDate] = useState(localIsoPlusDays(3));
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [status, setStatus] = useState<OrderStatus>("pendente");

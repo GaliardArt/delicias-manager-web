@@ -6,10 +6,7 @@ import { Input } from "@/components/ui/Input";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { Button } from "@/components/ui/Button";
 import { createExpense } from "@/lib/firebase/expenses";
-
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import { todayLocalIso } from "@/lib/utils/format";
 
 interface ExpenseFormProps {
   onSuccess: () => void;
@@ -19,7 +16,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
   const [amountCents, setAmountCents] = useState(0);
-  const [date, setDate] = useState(todayIso());
+  const [date, setDate] = useState(todayLocalIso());
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

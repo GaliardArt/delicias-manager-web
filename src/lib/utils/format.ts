@@ -40,6 +40,31 @@ export function formatPhoneBR(phone: string): string {
   return phone;
 }
 
+// Data de hoje no fuso horário LOCAL do dispositivo, no formato YYYY-MM-DD.
+// Nunca usar `new Date().toISOString().slice(0, 10)` para isso: toISOString
+// converte para UTC, então entre ~21h e 23h59 no horário de Brasília (UTC-3)
+// o UTC já virou o dia seguinte e o campo de data viria preenchido com
+// amanhã em vez de hoje — fazendo a conta "sumir" dos filtros de período
+// (Hoje/Semana/Mês), que comparam com a data local.
+export function todayLocalIso(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+// Mesma ideia de `todayLocalIso`, mas para "daqui a N dias" (aceita negativo
+// para "N dias atrás"), sempre no fuso horário local.
+export function localIsoPlusDays(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function reaisToCents(value: string | number): number {
   if (typeof value === "number") return Math.round(value * 100);
   const normalized = value.replace(/\./g, "").replace(",", ".");
