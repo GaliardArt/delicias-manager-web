@@ -1,7 +1,6 @@
 import {
   addDoc,
   collection,
-  deleteDoc,
   doc,
   DocumentData,
   getDoc,
@@ -26,6 +25,7 @@ function mapProductDoc(id: string, data: DocumentData): Product {
     priceCents: data.priceCents,
     unit: data.unit,
     yieldQuantity: data.yieldQuantity ?? 1,
+    yieldWeightGrams: data.yieldWeightGrams ?? 0,
     description: data.description,
     active: data.active,
     createdAt: data.createdAt,
@@ -63,6 +63,7 @@ interface ProductInput {
   priceCents: number;
   unit: string;
   yieldQuantity: number;
+  yieldWeightGrams: number;
   description?: string;
   recipeItems: RecipeItem[];
 }
@@ -70,6 +71,7 @@ interface ProductInput {
 export async function createProduct(input: ProductInput): Promise<string> {
   const ref = await addDoc(collection(db, "products"), {
     ...input,
+    yieldWeightGrams: Math.max(0, input.yieldWeightGrams || 0),
     stockQuantity: 0,
     active: true,
     createdAt: serverTimestamp(),
@@ -78,11 +80,10 @@ export async function createProduct(input: ProductInput): Promise<string> {
 }
 
 export async function updateProduct(id: string, input: ProductInput): Promise<void> {
-  await updateDoc(doc(db, "products", id), { ...input });
-}
-
-export async function deleteProduct(id: string): Promise<void> {
-  await deleteDoc(doc(db, "products", id));
+  await updateDoc(doc(db, "products", id), {
+    ...input,
+    yieldWeightGrams: Math.max(0, input.yieldWeightGrams || 0),
+  });
 }
 
 export async function setProductActive(id: string, active: boolean): Promise<void> {

@@ -45,6 +45,7 @@ export interface Product {
   priceCents: number;
   unit: string; // unidade, caixa, pacote, kg, dúzia...
   yieldQuantity: number; // quanto a receita rende, na unidade do produto
+  yieldWeightGrams: number; // peso de cada unidade/rendimento; 0 quando não informado
   description?: string;
   active: boolean;
   createdAt: string;

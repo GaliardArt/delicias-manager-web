@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
-import { AlertCircle, ArrowLeft, Pencil, Power, Boxes, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, Pencil, Power, Boxes } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -13,17 +13,22 @@ import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { StockAdjustDialog } from "@/components/ui/StockAdjustDialog";
 import { ProductForm } from "@/features/products/components/ProductForm";
-import { getProduct, setProductActive, deleteProduct, adjustProductStock } from "@/lib/firebase/products";
+import { getProduct, setProductActive, adjustProductStock } from "@/lib/firebase/products";
 import { listAllInsumos } from "@/lib/firebase/insumos";
 import { listAllIngredientes } from "@/lib/firebase/ingredientes";
 import { getProductStats, ProductStats } from "@/lib/firebase/stats";
-import { resolveProductCost, toInsumosMap, toIngredientesMap } from "@/lib/costing";
+import {
+  resolveProductCost,
+  resolveProductCostPerGram,
+  resolveProductTotalWeightGrams,
+  toInsumosMap,
+  toIngredientesMap,
+} from "@/lib/costing";
 import { Product, Insumo, Ingrediente } from "@/types";
 import { formatCurrencyBRL } from "@/lib/utils/format";
 
 export default function ProductDetailPage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
   const [product, setProduct] = useState<Product | null | undefined>(undefined);
   const [insumos, setInsumos] = useState<Insumo[]>([]);
   const [ingredientes, setIngredientes] = useState<Ingrediente[]>([]);
@@ -31,7 +36,6 @@ export default function ProductDetailPage() {
   const [error, setError] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [stockOpen, setStockOpen] = useState(false);
 
   async function load() {
@@ -73,6 +77,19 @@ export default function ProductDetailPage() {
   );
   const margin = product ? product.priceCents - cost : 0;
   const marginPct = product && product.priceCents > 0 ? (margin / product.priceCents) * 100 : 0;
+  const totalWeightGrams = product
+    ? resolveProductTotalWeightGrams(product.yieldQuantity, product.yieldWeightGrams)
+    : 0;
+  const costPerGram =
+    product && product.yieldWeightGrams > 0
+      ? resolveProductCostPerGram(
+          product.recipeItems,
+          toInsumosMap(insumos),
+          toIngredientesMap(ingredientes),
+          product.yieldQuantity,
+          product.yieldWeightGrams
+        )
+      : 0;
 
   return (
     <AppShell title="Produto">
@@ -125,6 +142,11 @@ export default function ProductDetailPage() {
                 <p className="font-display text-base font-semibold text-ink">
                   {product.yieldQuantity} {product.unit}
                 </p>
+                {product.yieldWeightGrams > 0 && (
+                  <p className="mt-0.5 text-xs text-ink-muted">
+                    {product.yieldWeightGrams.toLocaleString("pt-BR")} g por unidade
+                  </p>
+                )}
               </div>
               <div>
                 <p className="text-ink-muted">Estoque</p>
@@ -144,6 +166,22 @@ export default function ProductDetailPage() {
                       {formatCurrencyBRL(cost)}
                     </p>
                   </div>
+                  {product.yieldWeightGrams > 0 && (
+                    <>
+                      <div>
+                        <p className="text-ink-muted">Custo / g</p>
+                        <p className="font-display text-base font-semibold text-ink">
+                          {formatCurrencyBRL(costPerGram)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-ink-muted">Peso total da receita</p>
+                        <p className="font-display text-base font-semibold text-ink">
+                          {totalWeightGrams.toLocaleString("pt-BR")} g
+                        </p>
+                      </div>
+                    </>
+                  )}
                   <div>
                     <p className="text-ink-muted">Margem</p>
                     <p className="font-display text-base font-semibold text-success-700">
@@ -163,9 +201,6 @@ export default function ProductDetailPage() {
               </Button>
               <Button variant="ghost" size="sm" onClick={() => setConfirmOpen(true)}>
                 <Power className="h-4 w-4" /> {product.active ? "Desativar" : "Reativar"}
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmOpen(true)}>
-                <Trash2 className="h-4 w-4" /> Deletar
               </Button>
             </div>
           </Card>
@@ -250,18 +285,6 @@ export default function ProductDetailPage() {
             onConfirm={async () => {
               await setProductActive(product.id, !product.active);
               load();
-            }}
-          />
-          <ConfirmDialog
-            open={deleteConfirmOpen}
-            onClose={() => setDeleteConfirmOpen(false)}
-            title="Deletar produto"
-            description={`Essa ação é permanente e não pode ser desfeita. O produto ${product.name} será removido do sistema. Se ele estiver sendo usado em históricos ou receitas, essas referências não serão reconstruídas.`}
-            confirmLabel="Deletar definitivamente"
-            danger
-            onConfirm={async () => {
-              await deleteProduct(product.id);
-              router.push("/produtos");
             }}
           />
         </>

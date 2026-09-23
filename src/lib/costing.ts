@@ -69,3 +69,39 @@ export function toInsumosMap(insumos: Insumo[]): Map<string, Insumo> {
 export function toIngredientesMap(ingredientes: Ingrediente[]): Map<string, Ingrediente> {
   return new Map(ingredientes.map((i) => [i.id, i]));
 }
+
+
+// Custo total da receita de um produto, antes de dividir pelo rendimento.
+export function resolveProductRecipeTotalCost(
+  recipeItems: RecipeItem[],
+  insumosById: Map<string, Insumo>,
+  ingredientesById: Map<string, Ingrediente>
+): number {
+  return resolveRecipeCost(recipeItems, insumosById, ingredientesById);
+}
+
+// Custo por grama do produto final. O peso é opcional: sem peso válido,
+// retorna 0 para não inventar precisão em produtos antigos.
+export function resolveProductCostPerGram(
+  recipeItems: RecipeItem[],
+  insumosById: Map<string, Insumo>,
+  ingredientesById: Map<string, Ingrediente>,
+  yieldQuantity = 1,
+  yieldWeightGrams = 0
+): number {
+  if (yieldQuantity <= 0 || yieldWeightGrams <= 0) return 0;
+
+  const totalWeightGrams = yieldQuantity * yieldWeightGrams;
+  if (totalWeightGrams <= 0) return 0;
+
+  return resolveRecipeCost(recipeItems, insumosById, ingredientesById) / totalWeightGrams;
+}
+
+// Peso total produzido pela receita do produto.
+export function resolveProductTotalWeightGrams(
+  yieldQuantity = 1,
+  yieldWeightGrams = 0
+): number {
+  if (yieldQuantity <= 0 || yieldWeightGrams <= 0) return 0;
+  return yieldQuantity * yieldWeightGrams;
+}

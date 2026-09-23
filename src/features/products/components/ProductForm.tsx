@@ -9,7 +9,13 @@ import { Button } from "@/components/ui/Button";
 import { RecipeBuilder } from "@/features/recipes/components/RecipeBuilder";
 import { Ingrediente, Insumo, Product, RecipeItem } from "@/types";
 import { createProduct, updateProduct } from "@/lib/firebase/products";
-import { resolveProductCost, toInsumosMap, toIngredientesMap } from "@/lib/costing";
+import {
+  resolveProductCost,
+  resolveProductCostPerGram,
+  resolveProductTotalWeightGrams,
+  toInsumosMap,
+  toIngredientesMap,
+} from "@/lib/costing";
 import { formatCurrencyBRL } from "@/lib/utils/format";
 
 const unitOptions = ["unidade", "caixa", "pacote", "kg", "dúzia"];
@@ -26,6 +32,7 @@ export function ProductForm({ product, insumos, ingredientes, onSuccess }: Produ
   const [category, setCategory] = useState(product?.category ?? "");
   const [unit, setUnit] = useState(product?.unit ?? "unidade");
   const [yieldQuantity, setYieldQuantity] = useState(product?.yieldQuantity ?? 1);
+  const [yieldWeightGrams, setYieldWeightGrams] = useState(product?.yieldWeightGrams ?? 0);
   const [priceCents, setPriceCents] = useState(product?.priceCents ?? 0);
   const [description, setDescription] = useState(product?.description ?? "");
   const [recipeItems, setRecipeItems] = useState<RecipeItem[]>(product?.recipeItems ?? []);
@@ -44,6 +51,20 @@ export function ProductForm({ product, insumos, ingredientes, onSuccess }: Produ
   );
   const previewMargin = priceCents - previewCost;
   const previewMarginPct = priceCents > 0 ? (previewMargin / priceCents) * 100 : 0;
+  const previewCostPerGram =
+    yieldWeightGrams > 0
+      ? resolveProductCostPerGram(
+          recipeItems,
+          toInsumosMap(insumos),
+          toIngredientesMap(ingredientes),
+          yieldQuantity,
+          yieldWeightGrams
+        )
+      : 0;
+  const previewTotalWeightGrams = resolveProductTotalWeightGrams(
+    yieldQuantity,
+    yieldWeightGrams
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -69,6 +90,7 @@ export function ProductForm({ product, insumos, ingredientes, onSuccess }: Produ
         category: category.trim() || "Geral",
         unit,
         yieldQuantity,
+        yieldWeightGrams: Math.max(0, yieldWeightGrams || 0),
         priceCents,
         description: description.trim(),
         recipeItems,
@@ -112,18 +134,34 @@ export function ProductForm({ product, insumos, ingredientes, onSuccess }: Produ
           ))}
         </Select>
       </div>
-      <div>
-        <Input
-          label="Rendimento"
-          type="number"
-          min={0}
-          step="any"
-          value={yieldQuantity}
-          onChange={(e) => setYieldQuantity(Number(e.target.value))}
-        />
-        <p className="mt-1.5 text-xs text-ink-muted">
-          Ex: essa receita rende {yieldQuantity || 0} {unit} de {name || "produto"}.
-        </p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <Input
+            label="Rendimento"
+            type="number"
+            min={0}
+            step="any"
+            value={yieldQuantity}
+            onChange={(e) => setYieldQuantity(Number(e.target.value))}
+          />
+          <p className="mt-1.5 text-xs text-ink-muted">
+            Ex: essa receita rende {yieldQuantity || 0} {unit}.
+          </p>
+        </div>
+        <div>
+          <Input
+            label="Peso de cada unidade (g)"
+            type="number"
+            min={0}
+            step="any"
+            value={yieldWeightGrams || ""}
+            onChange={(e) => setYieldWeightGrams(Number(e.target.value))}
+            placeholder="Ex.: 100"
+          />
+          <p className="mt-1.5 text-xs text-ink-muted">
+            Informe para calcular peso total e custo por grama.
+          </p>
+        </div>
       </div>
       <Input
         label="Descrição (opcional)"
@@ -145,10 +183,24 @@ export function ProductForm({ product, insumos, ingredientes, onSuccess }: Produ
       </div>
 
       {recipeItems.length > 0 && (
-        <div className="grid grid-cols-2 gap-3 rounded-xl bg-babypink px-3.5 py-3 text-sm">
+        <div className="grid grid-cols-2 gap-3 rounded-xl bg-babypink px-3.5 py-3 text-sm sm:grid-cols-4">
           <div>
-            <span className="block text-brand-700">Custo calculado</span>
+            <span className="block text-brand-700">Custo / unidade</span>
             <span className="font-semibold text-brand-800">{formatCurrencyBRL(previewCost)}</span>
+          </div>
+          <div>
+            <span className="block text-brand-700">Custo / grama</span>
+            <span className="font-semibold text-brand-800">
+              {yieldWeightGrams > 0 ? formatCurrencyBRL(previewCostPerGram) : "—"}
+            </span>
+          </div>
+          <div>
+            <span className="block text-brand-700">Peso total</span>
+            <span className="font-semibold text-brand-800">
+              {previewTotalWeightGrams > 0
+                ? `${previewTotalWeightGrams.toLocaleString("pt-BR")} g`
+                : "—"}
+            </span>
           </div>
           <div>
             <span className="block text-brand-700">Margem</span>
