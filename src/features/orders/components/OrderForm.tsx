@@ -9,7 +9,7 @@ import { Select } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Customer, Ingrediente, Insumo, OrderStatus, PaymentMethod, Product, SaleItem } from "@/types";
+import { Customer, Ingrediente, Insumo, PaymentMethod, Product, SaleItem } from "@/types";
 import { listActiveCustomers } from "@/lib/firebase/customers";
 import { listActiveProducts } from "@/lib/firebase/products";
 import { listActiveInsumos } from "@/lib/firebase/insumos";
@@ -18,11 +18,8 @@ import { createOrder } from "@/lib/firebase/orders";
 import { resolveProductCost, toInsumosMap, toIngredientesMap } from "@/lib/costing";
 import { formatCurrencyBRL, localIsoPlusDays } from "@/lib/utils/format";
 import { paymentMethodOptions } from "@/lib/utils/payment-method";
-import { orderStatusLabel } from "@/lib/utils/order-status";
-
-const statusOptions: OrderStatus[] = ["pendente", "confirmada", "em_producao", "pronta"];
-
-export function OrderForm() {
+old status import
+old optionsexport function OrderForm() {
   const router = useRouter();
 
   const [customers, setCustomers] = useState<Customer[] | null>(null);
@@ -36,8 +33,7 @@ export function OrderForm() {
   const [expectedDate, setExpectedDate] = useState(localIsoPlusDays(3));
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [notes, setNotes] = useState("");
-  const [status, setStatus] = useState<OrderStatus>("pendente");
-
+old state
   const [pendingProductId, setPendingProductId] = useState("");
   const [pendingQuantity, setPendingQuantity] = useState(1);
   const [pendingPriceCents, setPendingPriceCents] = useState(0);
@@ -142,11 +138,9 @@ export function OrderForm() {
         customerId: selectedCustomer.id,
         customerName: selectedCustomer.name,
         items,
-        totalCents,
         expectedDate,
         deliveryAddress,
         notes,
-        status,
         initialPaymentCents: paidCents,
         initialPaymentMethod: method,
       });
@@ -216,25 +210,17 @@ export function OrderForm() {
               </option>
             ))}
           </Select>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Input
-              label="Data prevista de entrega"
-              type="date"
-              value={expectedDate}
-              onChange={(e) => setExpectedDate(e.target.value)}
-            />
-            <Select
-              label="Status"
-              value={status}
-              onChange={(e) => setStatus(e.target.value as OrderStatus)}
-            >
-              {statusOptions.map((s) => (
-                <option key={s} value={s}>
-                  {orderStatusLabel[s]}
-                </option>
-              ))}
-            </Select>
-          </div>
+          <Input
+            label="Data prevista de entrega"
+            type="date"
+            value={expectedDate}
+            onChange={(e) => setExpectedDate(e.target.value)}
+          />
+          <p className="text-xs text-ink-muted">
+            A encomenda começa em <strong className="text-ink">Em produção</strong> e
+            só passa para <strong className="text-ink">Finalizada</strong> quando o
+            Dia de Venda for encerrado.
+          </p>
           <Input
             label="Endereço de entrega (opcional)"
             value={deliveryAddress}

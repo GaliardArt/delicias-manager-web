@@ -18,6 +18,7 @@ import { Order, OrderStatus, Payment, PaymentMethod, SaleItem } from "@/types";
 import { logActivity } from "./activity";
 import { normalizeSaleItems } from "@/lib/utils/normalize-items";
 import { todayLocalIso } from "@/lib/utils/format";
+import { normalizeOrderStatus } from "@/lib/utils/order-status";
 import { ensureOpenSalesDay } from "./sales-days";
 
 function tsToIso(value: unknown): string {
@@ -29,11 +30,9 @@ interface CreateOrderInput {
   customerId: string;
   customerName: string;
   items: SaleItem[];
-  totalCents: number;
   expectedDate: string; // YYYY-MM-DD
   deliveryAddress?: string;
   notes?: string;
-  status: OrderStatus;
   /** Sinal/depósito pago no ato do cadastro (0 se nada pago ainda). */
   initialPaymentCents: number;
   initialPaymentMethod: PaymentMethod;
@@ -46,11 +45,9 @@ export async function createOrder(input: CreateOrderInput): Promise<string> {
     customerId,
     customerName,
     items,
-    totalCents,
     expectedDate,
     deliveryAddress,
     notes,
-    status,
     initialPaymentCents,
     initialPaymentMethod,
   } = input;
@@ -58,6 +55,13 @@ export async function createOrder(input: CreateOrderInput): Promise<string> {
   if (items.length === 0) {
     throw new Error("A encomenda precisa ter ao menos um produto.");
   }
+
+  const normalizedItems = items.map((item) => ({
+    ...item,
+    totalCents: Math.round(item.unitPriceCents * item.quantity),
+  }));
+  const totalCents = normalizedItems.reduce((sum, item) => sum + item.totalCents, 0);
+
   if (initialPaymentCents > totalCents) {
     throw new Error("O valor pago não pode ser maior que o total da encomenda.");
   }
@@ -72,7 +76,7 @@ export async function createOrder(input: CreateOrderInput): Promise<string> {
   batch.set(orderRef, {
     customerId,
     customerName,
-    items,
+    items: normalizedItems,
     totalCents,
     paidCents: initialPaymentCents,
     pendingCents,
@@ -80,7 +84,7 @@ export async function createOrder(input: CreateOrderInput): Promise<string> {
     expectedDate,
     deliveryAddress: deliveryAddress ?? "",
     notes: notes ?? "",
-    status,
+    status: "em_producao",
     createdAt: serverTimestamp(),
     createdBy: auth.currentUser?.uid ?? null,
   });
@@ -129,10 +133,10 @@ export interface OrderListItem {
   items: SaleItem[];
 }
 
-// Uma encomenda "concluída" (paga + entregue) sai da lista principal para não
-// confundir com pedidos em aberto — vai para /encomendas/historico.
-export function isOrderCompleted(order: Pick<OrderListItem, "status" | "pendingCents">): boolean {
-  return order.status === "entregue" && order.pendingCents <= 0;
+// "Finalizada" representa somente a entrega/conclusão operacional.
+// Pagamento é controlado separadamente por paidCents/pendingCents.
+export function isOrderCompleted(order: Pick<OrderListItem, "status">): boolean {
+  return order.status === "finalizada";
 }
 
 export async function listRecentOrders(max = 150): Promise<OrderListItem[]> {
@@ -147,7 +151,7 @@ export async function listRecentOrders(max = 150): Promise<OrderListItem[]> {
       paidCents: data.paidCents,
       pendingCents: data.pendingCents,
       expectedDate: data.expectedDate,
-      status: data.status,
+      status: normalizeOrderStatus(data.status),
       itemsCount: Array.isArray(data.items) ? data.items.length : 0,
       items: normalizeSaleItems(data.items),
     };
@@ -185,7 +189,7 @@ export async function getOrderWithPayments(orderId: string): Promise<Order | nul
     expectedDate: data.expectedDate,
     deliveryAddress: data.deliveryAddress,
     notes: data.notes,
-    status: data.status,
+    status: normalizeOrderStatus(data.status),
     payments,
   } as Order & { payments: Payment[] };
 }
@@ -291,14 +295,26 @@ export async function deleteOrder(orderId: string): Promise<void> {
   await batch.commit();
 }
 
-// Troca de status é uma correção local segura (seção 31) — não muda dinheiro
-// nem estrutura, só o estágio operacional da encomenda.
-export async function updateOrderStatus(orderId: string, status: OrderStatus): Promise<void> {
-  await updateDoc(doc(db, "orders", orderId), { status });
+// O fechamento do Dia de Venda é a operação que finaliza uma encomenda.
+// Cancelamento continua disponível enquanto ela ainda não foi finalizada.
+export async function cancelOrder(orderId: string): Promise<void> {
+  const orderRef = doc(db, "orders", orderId);
 
-  if (status === "cancelada") {
-    await logActivity("pedido_cancelado", "Encomenda cancelada", orderId);
-  }
+  await runTransaction(db, async (transaction) => {
+    const orderSnap = await transaction.get(orderRef);
+    if (!orderSnap.exists()) {
+      throw new Error("Encomenda não encontrada.");
+    }
+
+    const order = orderSnap.data();
+    if (normalizeOrderStatus(order.status) === "finalizada") {
+      throw new Error("Uma encomenda finalizada não pode ser cancelada.");
+    }
+
+    transaction.update(orderRef, { status: "cancelada" });
+  });
+
+  await logActivity("pedido_cancelado", "Encomenda cancelada", orderId);
 }
 
 // Resumo de produção para o WhatsApp (seção 17): cliente + produtos a produzir,

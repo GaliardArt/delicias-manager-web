@@ -78,8 +78,8 @@ export default function EncomendasHistoricoPage() {
       {completed && completed.length === 0 && !error && (
         <EmptyState
           icon={History}
-          title="Nenhuma encomenda concluída ainda"
-          description="Encomendas aparecem aqui automaticamente quando ficam pagas e marcadas como entregues."
+          title="Nenhuma encomenda finalizada ainda"
+          description="Encomendas aparecem aqui quando o respectivo Dia de Venda é encerrado e elas são marcadas como entregues."
         />
       )}
 

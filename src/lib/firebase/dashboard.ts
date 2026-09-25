@@ -4,6 +4,7 @@ import { ActivityEvent, DashboardSummary, Order, SalesDay } from "@/types";
 import { getOpenDayGroups, summarizeOrders, todayIso } from "./sales-days";
 import { summarizeSales } from "./reports";
 import { normalizeSaleItems } from "@/lib/utils/normalize-items";
+import { normalizeOrderStatus } from "@/lib/utils/order-status";
 
 function tsToIso(value: unknown): string {
   if (value instanceof Timestamp) return value.toDate().toISOString();
@@ -64,10 +65,10 @@ async function getUpcomingOrders(): Promise<Order[]> {
         expectedDate: data.expectedDate,
         deliveryAddress: data.deliveryAddress,
         notes: data.notes,
-        status: data.status,
+        status: normalizeOrderStatus(data.status),
       } as Order;
     })
-    .filter((o) => o.status !== "entregue" && o.status !== "cancelada")
+    .filter((o) => o.status !== "finalizada" && o.status !== "cancelada")
     .slice(0, 5);
 }
 

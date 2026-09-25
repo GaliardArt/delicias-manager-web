@@ -28,7 +28,7 @@ interface CreateSaleInput {
   customerId: string;
   customerName: string;
   items: SaleItem[];
-  totalCents: number;
+  discountCents: number;
   /** Pagamento já recebido no ato da venda (0 para fiado total). */
   initialPaymentCents: number;
   initialPaymentMethod: PaymentMethod;
@@ -38,12 +38,34 @@ interface CreateSaleInput {
 // um único batch atômico, para nunca deixar uma venda "pela metade" (seção 21).
 // customerId pode vir vazio para vendas avulsas (cliente não cadastrado).
 export async function createSale(input: CreateSaleInput): Promise<string> {
-  const { customerId, customerName, items, totalCents, initialPaymentCents, initialPaymentMethod } =
-    input;
+  const {
+    customerId,
+    customerName,
+    items,
+    discountCents,
+    initialPaymentCents,
+    initialPaymentMethod,
+  } = input;
 
   if (items.length === 0) {
     throw new Error("A venda precisa ter ao menos um produto.");
   }
+  if (!Number.isInteger(discountCents) || discountCents < 0) {
+    throw new Error("O desconto da venda é inválido.");
+  }
+
+  const normalizedItems = items.map((item) => ({
+    ...item,
+    totalCents: Math.round(item.unitPriceCents * item.quantity),
+  }));
+  const subtotalCents = normalizedItems.reduce((sum, item) => sum + item.totalCents, 0);
+
+  if (discountCents > subtotalCents) {
+    throw new Error("O desconto não pode ser maior que o subtotal da venda.");
+  }
+
+  const totalCents = subtotalCents - discountCents;
+
   if (initialPaymentCents > totalCents) {
     throw new Error("O valor pago não pode ser maior que o total da venda.");
   }
@@ -57,7 +79,9 @@ export async function createSale(input: CreateSaleInput): Promise<string> {
   batch.set(saleRef, {
     customerId,
     customerName,
-    items,
+    items: normalizedItems,
+    subtotalCents,
+    discountCents,
     totalCents,
     paidCents: initialPaymentCents,
     pendingCents,
@@ -204,13 +228,21 @@ export async function getSaleWithPayments(saleId: string): Promise<Sale | null> 
     };
   });
 
+  const normalizedItems = normalizeSaleItems(data.items);
+  const fallbackSubtotalCents = normalizedItems.reduce(
+    (sum, item) => sum + item.totalCents,
+    0
+  );
+
   return {
     id: saleSnap.id,
     customerId: data.customerId,
     customerName: data.customerName,
-    items: normalizeSaleItems(data.items),
-    totalCents: data.totalCents,
-    paidCents: data.paidCents,
+    items: normalizedItems,
+    subtotalCents: Number(data.subtotalCents ?? fallbackSubtotalCents),
+    discountCents: Number(data.discountCents ?? 0),
+    totalCents: Number(data.totalCents ?? fallbackSubtotalCents),
+    paidCents: Number(data.paidCents ?? 0),
     pendingCents: data.pendingCents,
     payments,
     salesDayId: data.salesDayId,

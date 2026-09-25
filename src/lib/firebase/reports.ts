@@ -6,6 +6,8 @@ export interface RawSale {
   id: string;
   customerId: string;
   customerName: string;
+  subtotalCents: number;
+  discountCents: number;
   totalCents: number;
   paidCents: number;
   pendingCents: number;
@@ -31,11 +33,17 @@ export async function getAllSalesRaw(): Promise<RawSale[]> {
     const createdAt =
       data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date();
     const items = Array.isArray(data.items) ? data.items : [];
+    const fallbackSubtotalCents = items.reduce(
+      (sum, item) => sum + Number(item.totalCents ?? 0),
+      0
+    );
     return {
       id: d.id,
       customerId: data.customerId,
       customerName: data.customerName,
-      totalCents: data.totalCents,
+      subtotalCents: Number(data.subtotalCents ?? fallbackSubtotalCents),
+      discountCents: Number(data.discountCents ?? 0),
+      totalCents: Number(data.totalCents ?? fallbackSubtotalCents),
       paidCents: data.paidCents,
       pendingCents: data.pendingCents,
       createdAt,

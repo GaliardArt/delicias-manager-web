@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { AlertCircle, ArrowLeft, MapPin } from "lucide-react";
+import { AlertCircle, ArrowLeft, FileText, MapPin } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import {
   getClosedDayWithOrders,
@@ -16,12 +17,15 @@ import {
 import { Order } from "@/types";
 import { formatCurrencyBRL, formatDateBR } from "@/lib/utils/format";
 import { orderStatusLabel, orderStatusTone } from "@/lib/utils/order-status";
+import { buildOrderNoteData, SimpleNoteData } from "@/lib/utils/simple-note";
+import { SimpleNoteModal } from "@/features/notes/components/SimpleNoteModal";
 
 export default function DiaDeVendaHistoricoDetailPage() {
   const params = useParams<{ id: string }>();
   const [day, setDay] = useState<SalesDayDoc | null | undefined>(undefined);
   const [orders, setOrders] = useState<Order[]>([]);
   const [error, setError] = useState(false);
+  const [noteOrder, setNoteOrder] = useState<Order | null>(null);
 
   async function load() {
     setError(false);
@@ -179,6 +183,15 @@ export default function DiaDeVendaHistoricoDetailPage() {
                       <Badge tone={orderStatusTone[order.status]}>
                         {orderStatusLabel[order.status]}
                       </Badge>
+                      {order.status !== "cancelada" && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => setNoteOrder(order)}
+                        >
+                          <FileText className="h-4 w-4" /> Nota
+                        </Button>
+                      )}
                     </div>
                   </li>
                 ))}
@@ -212,6 +225,26 @@ export default function DiaDeVendaHistoricoDetailPage() {
           )}
         </div>
       )}
+      <SimpleNoteModal
+        open={noteOrder !== null}
+        onClose={() => setNoteOrder(null)}
+        data={
+          noteOrder
+            ? buildOrderNoteData(noteOrder)
+            : ({
+                kindLabel: "Encomenda",
+                referenceId: "",
+                dateLabel: "",
+                customerName: "",
+                items: [],
+                subtotalCents: 0,
+                discountCents: 0,
+                totalCents: 0,
+                paidCents: 0,
+                pendingCents: 0,
+              } satisfies SimpleNoteData)
+        }
+      />
     </AppShell>
   );
 }

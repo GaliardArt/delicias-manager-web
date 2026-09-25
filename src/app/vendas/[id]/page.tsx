@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { AlertCircle, ArrowLeft, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, FileText, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -15,6 +15,8 @@ import { deleteSale, getSaleWithPayments } from "@/lib/firebase/sales";
 import { Sale } from "@/types";
 import { formatCurrencyBRL, formatDateTimeBR } from "@/lib/utils/format";
 import { paymentMethodLabel } from "@/lib/utils/payment-method";
+import { buildSaleNoteData } from "@/lib/utils/simple-note";
+import { SimpleNoteModal } from "@/features/notes/components/SimpleNoteModal";
 
 export default function SaleDetailPage() {
   const params = useParams<{ id: string }>();
@@ -22,6 +24,7 @@ export default function SaleDetailPage() {
   const [sale, setSale] = useState<Sale | null | undefined>(undefined);
   const [error, setError] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [noteOpen, setNoteOpen] = useState(false);
 
   async function load() {
     setError(false);
@@ -100,6 +103,20 @@ export default function SaleDetailPage() {
 
             <div className="flex flex-col gap-1.5 border-t border-line pt-3 text-sm">
               <div className="flex justify-between">
+                <span className="text-ink-muted">Subtotal</span>
+                <span className="font-semibold text-ink">
+                  {formatCurrencyBRL(sale.subtotalCents)}
+                </span>
+              </div>
+              {sale.discountCents > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-ink-muted">Desconto</span>
+                  <span className="font-semibold text-danger-700">
+                    - {formatCurrencyBRL(sale.discountCents)}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between">
                 <span className="text-ink-muted">Total</span>
                 <span className="font-semibold text-ink">
                   {formatCurrencyBRL(sale.totalCents)}
@@ -120,7 +137,10 @@ export default function SaleDetailPage() {
             </div>
           </Card>
 
-          <div className="flex justify-end">
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button variant="secondary" size="sm" onClick={() => setNoteOpen(true)}>
+              <FileText className="h-4 w-4" /> Nota simples
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmOpen(true)}>
               <Trash2 className="h-4 w-4" /> Deletar venda
             </Button>
@@ -158,6 +178,14 @@ export default function SaleDetailPage() {
             </Card>
           )}
         </div>
+      )}
+
+      {sale && (
+        <SimpleNoteModal
+          open={noteOpen}
+          onClose={() => setNoteOpen(false)}
+          data={buildSaleNoteData(sale)}
+        />
       )}
 
       {sale && (

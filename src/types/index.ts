@@ -10,13 +10,7 @@ export type PaymentMethod =
   | "fiado"
   | "outros";
 
-export type OrderStatus =
-  | "pendente"
-  | "confirmada"
-  | "em_producao"
-  | "pronta"
-  | "entregue"
-  | "cancelada";
+export type OrderStatus = "em_producao" | "finalizada" | "cancelada";
 
 export interface Customer {
   id: string;
@@ -118,6 +112,8 @@ export interface Sale {
   customerId: string;
   customerName: string;
   items: SaleItem[];
+  subtotalCents: number;
+  discountCents: number;
   totalCents: number;
   paidCents: number; // derivado da soma dos pagamentos
   pendingCents: number; // totalCents - paidCents
