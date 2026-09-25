@@ -16,24 +16,54 @@ import { db } from "./config";
 import { Ingrediente, Insumo, RecipeItem } from "@/types";
 import { resolveIngredienteUnitCost, toInsumosMap, toIngredientesMap } from "@/lib/costing";
 
+/**
+ * Sempre calcula o custo atual dos ingredientes a partir dos insumos e
+ * ingredientes existentes no Firestore. O campo unitCostCents salvo no
+ * documento é tratado como valor derivado/cache e nunca como fonte de verdade.
+ *
+ * Isso garante que uma alteração de preço de um insumo seja refletida
+ * imediatamente em ingredientes que usam esse insumo, inclusive quando
+ * existem ingredientes dentro de ingredientes.
+ */
+async function loadIngredientesWithCurrentCost(activeOnly = false): Promise<Ingrediente[]> {
+  const [ingredientesSnap, insumosSnap] = await Promise.all([
+    getDocs(query(collection(db, "ingredientes"), orderBy("name", "asc"))),
+    getDocs(query(collection(db, "insumos"), orderBy("name", "asc"))),
+  ]);
+
+  const ingredientes = ingredientesSnap.docs.map(
+    (d) => ({ id: d.id, ...d.data() } as Ingrediente)
+  );
+  const insumos = insumosSnap.docs.map(
+    (d) => ({ id: d.id, ...d.data() } as Insumo)
+  );
+
+  const insumosById = toInsumosMap(insumos);
+  const ingredientesById = toIngredientesMap(ingredientes);
+
+  const current = ingredientes.map((ingrediente) => ({
+    ...ingrediente,
+    unitCostCents: resolveIngredienteUnitCost(
+      ingrediente,
+      insumosById,
+      ingredientesById
+    ),
+  }));
+
+  return activeOnly ? current.filter((ingrediente) => ingrediente.active) : current;
+}
+
 export async function listActiveIngredientes(): Promise<Ingrediente[]> {
-  const q = query(collection(db, "ingredientes"), where("active", "==", true));
-  const snapshot = await getDocs(q);
-  return snapshot.docs
-    .map((d) => ({ id: d.id, ...d.data() } as Ingrediente))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  return loadIngredientesWithCurrentCost(true);
 }
 
 export async function listAllIngredientes(): Promise<Ingrediente[]> {
-  const q = query(collection(db, "ingredientes"), orderBy("name", "asc"));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Ingrediente));
+  return loadIngredientesWithCurrentCost(false);
 }
 
 export async function getIngrediente(id: string): Promise<Ingrediente | null> {
-  const snap = await getDoc(doc(db, "ingredientes", id));
-  if (!snap.exists()) return null;
-  return { id: snap.id, ...snap.data() } as Ingrediente;
+  const ingredientes = await loadIngredientesWithCurrentCost(false);
+  return ingredientes.find((ingrediente) => ingrediente.id === id) ?? null;
 }
 
 interface IngredienteInput {
