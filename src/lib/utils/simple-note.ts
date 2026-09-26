@@ -168,8 +168,9 @@ function buildPdfLines(data: SimpleNoteData): PdfLine[] {
 }
 
 function buildPages(lines: PdfLine[]): PdfLine[][] {
-  const pages: PdfLine[][] = [[]];
-  let currentPage = pages[0];
+  const firstPage: PdfLine[] = [];
+  const pages: PdfLine[][] = [firstPage];
+  let currentPage = firstPage;
   let used = 0;
   const available = 755;
 
