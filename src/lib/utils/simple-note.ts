@@ -220,7 +220,9 @@ export function generateSimpleNotePdf(data: SimpleNoteData): Blob {
     const pageObjectNumber = 5 + i * 2;
     const contentObjectNumber = pageObjectNumber + 1;
     pageObjectNumbers.push(pageObjectNumber);
-    const stream = makeContentStream(pages[i]);
+    const page = pages[i];
+    if (!page) continue;
+    const stream = makeContentStream(page);
     objects[pageObjectNumber] =
       "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents " +
       contentObjectNumber + " 0 R >>";
