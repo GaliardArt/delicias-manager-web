@@ -18,8 +18,8 @@ import { createOrder } from "@/lib/firebase/orders";
 import { resolveProductCost, toInsumosMap, toIngredientesMap } from "@/lib/costing";
 import { formatCurrencyBRL, localIsoPlusDays } from "@/lib/utils/format";
 import { paymentMethodOptions } from "@/lib/utils/payment-method";
-old status import
-old optionsexport function OrderForm() {
+
+export function OrderForm() {
   const router = useRouter();
 
   const [customers, setCustomers] = useState<Customer[] | null>(null);
@@ -33,7 +33,6 @@ old optionsexport function OrderForm() {
   const [expectedDate, setExpectedDate] = useState(localIsoPlusDays(3));
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [notes, setNotes] = useState("");
-old state
   const [pendingProductId, setPendingProductId] = useState("");
   const [pendingQuantity, setPendingQuantity] = useState(1);
   const [pendingPriceCents, setPendingPriceCents] = useState(0);
