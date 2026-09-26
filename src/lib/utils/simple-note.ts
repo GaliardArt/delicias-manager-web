@@ -169,17 +169,19 @@ function buildPdfLines(data: SimpleNoteData): PdfLine[] {
 
 function buildPages(lines: PdfLine[]): PdfLine[][] {
   const pages: PdfLine[][] = [[]];
+  let currentPage = pages[0];
   let used = 0;
   const available = 755;
 
   for (const line of lines) {
     const size = line.size ?? 10;
     const step = line.gap ?? (size >= 16 ? 24 : size >= 12 ? 20 : 15);
-    if (used + step > available && pages[pages.length - 1].length > 0) {
-      pages.push([]);
+    if (used + step > available && currentPage.length > 0) {
+      currentPage = [];
+      pages.push(currentPage);
       used = 0;
     }
-    pages[pages.length - 1].push(line);
+    currentPage.push(line);
     used += step;
   }
   return pages;
