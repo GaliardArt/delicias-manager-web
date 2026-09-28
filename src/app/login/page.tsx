@@ -6,6 +6,8 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { signIn } from "@/lib/firebase/auth";
+import { getUserProfile } from "@/lib/firebase/users";
+import { WelcomeScreen } from "@/components/layout/WelcomeScreen";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function LoginPage() {
@@ -15,27 +17,51 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [welcomeName, setWelcomeName] = useState<string | null>(null);
+  const [welcomeFadingOut, setWelcomeFadingOut] = useState(false);
 
   // Já logado? Não faz sentido mostrar o formulário de novo.
   useEffect(() => {
-    if (!authLoading && user) {
+    if (!authLoading && user && !welcomeName) {
       router.replace("/dashboard");
     }
-  }, [authLoading, user, router]);
+  }, [authLoading, user, router, welcomeName]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      await signIn(email, password);
-      router.push("/dashboard");
+      const signedInUser = await signIn(email, password);
+      let name =
+        signedInUser.displayName?.trim() ||
+        email.split("@")[0]?.trim() ||
+        "usuário";
+
+      try {
+        const profile = await getUserProfile(signedInUser.uid);
+        if (profile?.name?.trim()) {
+          name = profile.name.trim();
+        }
+      } catch (profileError) {
+        console.error(profileError);
+      }
+
+      setWelcomeName(name);
+      setLoading(false);
+      window.setTimeout(() => setWelcomeFadingOut(true), 1250);
+      window.setTimeout(() => router.replace("/dashboard"), 1950);
+      return;
     } catch (err) {
       console.error(err);
       setError("E-mail ou senha incorretos. Tente novamente.");
     } finally {
       setLoading(false);
     }
+  }
+
+  if (welcomeName) {
+    return <WelcomeScreen name={welcomeName} fadingOut={welcomeFadingOut} />;
   }
 
   if (authLoading || user) {
