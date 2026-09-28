@@ -81,12 +81,22 @@ export interface Ingrediente {
   createdAt: string;
 }
 
+export type ExpenseKind = "fixa" | "variavel";
+export type ExpenseStatus = "pago" | "pendente";
+export type ExpenseRecurrence = "nenhuma" | "semanal" | "mensal" | "anual";
+
 export interface Expense {
   id: string;
   description: string;
   category: string;
   amountCents: number;
-  date: string; // YYYY-MM-DD
+  date: string; // YYYY-MM-DD — data da despesa
+  dueDate?: string; // YYYY-MM-DD — vencimento
+  paidAt?: string; // YYYY-MM-DD — data do pagamento
+  kind?: ExpenseKind; // compatível com lançamentos antigos
+  status?: ExpenseStatus; // compatível com lançamentos antigos
+  recurrence?: ExpenseRecurrence;
+  notes?: string;
   createdAt: string;
 }
 
