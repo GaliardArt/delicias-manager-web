@@ -665,11 +665,11 @@ export default function ContasPage() {
               </Select>
             </div>
 
-            {filtered.length === 0 ? (
+            {filtered.length === 0 && periodExpenses.length > 0 ? (
               <p className="rounded-2xl bg-surface-muted px-4 py-8 text-center text-sm text-ink-muted">
                 Nenhum lançamento corresponde aos filtros atuais.
               </p>
-            ) : (
+            ) : filtered.length > 0 ? (
               <div className="overflow-x-auto">
                 <div className="min-w-[760px]">
                   <div className="grid grid-cols-[1.6fr_1fr_.8fr_.8fr_auto] gap-3 border-b border-line px-2 pb-2 text-[11px] font-medium uppercase tracking-wide text-ink-faint">
@@ -771,17 +771,6 @@ export default function ContasPage() {
             )}
           </Card>
 
-          {periodExpenses.length === 0 && (
-            <div className="mt-4">
-              <EmptyState
-                icon={Receipt}
-                title="Nenhuma conta nesse período"
-                description="Registre gasolina, compra de insumos, energia, aluguel e outras despesas do negócio."
-                actionLabel="+ Nova conta"
-                onAction={openCreateModal}
-              />
-            </div>
-          )}
         </>
       )}
 
