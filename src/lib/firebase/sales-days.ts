@@ -16,6 +16,7 @@ import { db } from "./config";
 import { Order } from "@/types";
 import { getAllSalesRaw, RawSale, summarizeSales, SalesSummary } from "./reports";
 import { normalizeSaleItems } from "@/lib/utils/normalize-items";
+import { normalizeOrderStatus } from "@/lib/utils/order-status";
 import { todayLocalIso } from "@/lib/utils/format";
 
 function tsToIso(value: unknown): string {
@@ -74,7 +75,7 @@ function mapOrderDoc(id: string, data: DocumentData): Order {
     expectedDate: data.expectedDate,
     deliveryAddress: data.deliveryAddress,
     notes: data.notes,
-    status: data.status,
+    status: normalizeOrderStatus(data.status),
   };
 }
 
@@ -92,7 +93,7 @@ export interface SalesDaySummary {
 export function summarizeOrders(orders: Order[]): SalesDaySummary {
   const active = orders.filter((o) => o.status !== "cancelada");
   const cancelled = orders.filter((o) => o.status === "cancelada");
-  const notRealized = active.filter((o) => o.status !== "entregue");
+  const notRealized = active.filter((o) => o.status !== "finalizada");
 
   return {
     ordersCount: orders.length,
@@ -252,17 +253,19 @@ export async function getSalesForDate(date: string): Promise<RawSale[]> {
   return allSales.filter((s) => dateKey(s.createdAt) === date);
 }
 
-// Fecha o dia: grava o instantâneo dos totais (seção 15), combinando encomendas
-// + vendas avulsas do dia. As encomendas já devem estar com os pagamentos
-// "Pago" registrados de verdade (feito antes de chamar esta função). Não existe
-// edição depois disso; cada valor continua rastreável até a origem (seção 21) —
-// por isso o recorte de vendas fica guardado separado, não só somado.
+// Fecha o dia: grava o instantâneo dos totais, combinando encomendas + vendas
+// avulsas. As encomendas ativas do dia são marcadas como "finalizada" no mesmo
+// batch do fechamento. O pagamento não participa da decisão de entrega.
 export async function closeDay(
   date: string,
   orders: Order[],
   sales: RawSale[]
 ): Promise<string> {
-  const ordersSummary = summarizeOrders(orders);
+  const closingOrders = orders.map((order) => ({
+    ...order,
+    status: "finalizada" as const,
+  }));
+  const ordersSummary = summarizeOrders(closingOrders);
   const salesSummary: SalesSummary = summarizeSales(sales);
 
   const existingSnap = await getDocs(
@@ -279,6 +282,18 @@ export async function closeDay(
     : doc(db, "salesDays", date);
 
   const batch = writeBatch(db);
+
+  if (orders.length > 490) {
+    throw new Error("Há encomendas demais neste Dia de Venda para um fechamento atômico.");
+  }
+
+  for (const order of orders) {
+    if (order.status !== "cancelada") {
+      batch.update(doc(db, "orders", order.id), {
+        status: "finalizada",
+      });
+    }
+  }
 
   batch.set(dayRef, {
     date,

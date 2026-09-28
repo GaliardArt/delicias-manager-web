@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, AlertCircle } from "lucide-react";
+import { Plus, Trash2, AlertCircle, Percent } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
@@ -21,6 +21,8 @@ import { formatCurrencyBRL } from "@/lib/utils/format";
 import { paymentMethodOptions } from "@/lib/utils/payment-method";
 import { Users } from "lucide-react";
 
+type DiscountMode = "valor" | "percentual";
+
 export function SaleForm() {
   const router = useRouter();
 
@@ -38,6 +40,10 @@ export function SaleForm() {
   const [pendingProductId, setPendingProductId] = useState("");
   const [pendingQuantity, setPendingQuantity] = useState(1);
   const [pendingPriceCents, setPendingPriceCents] = useState(0);
+
+  const [discountMode, setDiscountMode] = useState<DiscountMode>("valor");
+  const [discountValueCents, setDiscountValueCents] = useState(0);
+  const [discountPercent, setDiscountPercent] = useState(0);
 
   const [method, setMethod] = useState<PaymentMethod>("dinheiro");
   const [paidCents, setPaidCents] = useState(0);
@@ -65,15 +71,21 @@ export function SaleForm() {
       });
   }, []);
 
-  const totalCents = items.reduce((sum, item) => sum + item.totalCents, 0);
+  const subtotalCents = items.reduce((sum, item) => sum + item.totalCents, 0);
+  const rawDiscountCents =
+    discountMode === "valor"
+      ? discountValueCents
+      : Math.round(subtotalCents * (discountPercent / 100));
+  const discountCents = Math.max(0, Math.round(rawDiscountCents));
+  const totalCents = Math.max(0, subtotalCents - discountCents);
 
-  // Mantém o valor pago acompanhando o total até o usuário editá-lo manualmente
-  // (ex: para registrar um pagamento parcial).
   useEffect(() => {
     if (method === "fiado") {
       setPaidCents(0);
     } else if (!paidTouched) {
       setPaidCents(totalCents);
+    } else {
+      setPaidCents((current) => Math.min(current, totalCents));
     }
   }, [totalCents, method, paidTouched]);
 
@@ -127,6 +139,10 @@ export function SaleForm() {
       setFormError("Adicione ao menos um produto à venda.");
       return;
     }
+    if (discountCents > subtotalCents) {
+      setFormError("O desconto não pode ser maior que o subtotal.");
+      return;
+    }
     if (paidCents > totalCents) {
       setFormError("O valor pago não pode ser maior que o total.");
       return;
@@ -138,7 +154,7 @@ export function SaleForm() {
         customerId: avulso ? "" : selectedCustomer!.id,
         customerName: effectiveCustomerName!,
         items,
-        totalCents,
+        discountCents,
         initialPaymentCents: paidCents,
         initialPaymentMethod: method,
       });
@@ -288,6 +304,65 @@ export function SaleForm() {
           >
             <Plus className="h-4 w-4" /> Adicionar
           </Button>
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Desconto</CardTitle>
+        </CardHeader>
+        <div className="flex flex-col gap-3">
+          <Select
+            label="Tipo de desconto"
+            value={discountMode}
+            onChange={(e) => setDiscountMode(e.target.value as DiscountMode)}
+          >
+            <option value="valor">Valor (R$)</option>
+            <option value="percentual">Percentual (%)</option>
+          </Select>
+
+          {discountMode === "valor" ? (
+            <MoneyInput
+              label="Desconto"
+              valueCents={discountValueCents}
+              onValueCentsChange={setDiscountValueCents}
+            />
+          ) : (
+            <div className="relative">
+              <Percent className="pointer-events-none absolute right-3.5 top-10 h-4 w-4 text-ink-faint" />
+              <Input
+                label="Desconto"
+                type="number"
+                min={0}
+                max={100}
+                step="0.01"
+                value={discountPercent}
+                onChange={(e) => setDiscountPercent(Number(e.target.value) || 0)}
+                className="pr-9"
+              />
+            </div>
+          )}
+
+          <div className="flex flex-col gap-1.5 border-t border-line pt-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-ink-muted">Subtotal</span>
+              <span className="font-semibold text-ink">{formatCurrencyBRL(subtotalCents)}</span>
+            </div>
+            {discountCents > 0 && (
+              <div className="flex justify-between">
+                <span className="text-ink-muted">Desconto</span>
+                <span className="font-semibold text-danger-700">
+                  - {formatCurrencyBRL(Math.min(discountCents, subtotalCents))}
+                </span>
+              </div>
+            )}
+            <div className="flex justify-between border-t border-line pt-1.5">
+              <span className="font-medium text-ink">Total</span>
+              <span className="font-display text-base font-semibold text-ink">
+                {formatCurrencyBRL(totalCents)}
+              </span>
+            </div>
+          </div>
         </div>
       </Card>
 

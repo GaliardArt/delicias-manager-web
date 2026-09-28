@@ -1,11 +1,13 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { signIn } from "@/lib/firebase/auth";
+import { signIn, syncCurrentUserDisplayName } from "@/lib/firebase/auth";
+import { ensureCurrentUserProfile } from "@/lib/firebase/users";
+import { POST_LOGIN_WELCOME_KEY } from "@/components/layout/PostLoginWelcome";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function LoginPage() {
@@ -15,10 +17,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const loginSubmitRef = useRef(false);
 
-  // Já logado? Não faz sentido mostrar o formulário de novo.
+  // Usuário que já estava autenticado deve ser redirecionado normalmente.
+  // Durante um login iniciado pelo botão "Entrar", aguardamos o fluxo terminar
+  // para não chegar ao dashboard antes de gravar a mensagem de boas-vindas.
   useEffect(() => {
-    if (!authLoading && user) {
+    if (!authLoading && user && !loginSubmitRef.current) {
       router.replace("/dashboard");
     }
   }, [authLoading, user, router]);
@@ -27,11 +32,40 @@ export default function LoginPage() {
     event.preventDefault();
     setError(null);
     setLoading(true);
+    loginSubmitRef.current = true;
+
     try {
-      await signIn(email, password);
-      router.push("/dashboard");
+      const signedInUser = await signIn(email, password);
+      let name =
+        signedInUser.displayName?.trim() ||
+        email.split("@")[0]?.trim() ||
+        "usuário";
+
+      try {
+        const profile = await ensureCurrentUserProfile();
+        if (profile?.name?.trim()) {
+          name = profile.name.trim();
+        }
+      } catch (profileError) {
+        console.error(profileError);
+      }
+
+      try {
+        await syncCurrentUserDisplayName(name);
+      } catch (authProfileError) {
+        console.error(authProfileError);
+      }
+
+      try {
+        sessionStorage.setItem(POST_LOGIN_WELCOME_KEY, name);
+      } catch (storageError) {
+        console.error(storageError);
+      }
+
+      router.replace("/dashboard");
     } catch (err) {
       console.error(err);
+      loginSubmitRef.current = false;
       setError("E-mail ou senha incorretos. Tente novamente.");
     } finally {
       setLoading(false);

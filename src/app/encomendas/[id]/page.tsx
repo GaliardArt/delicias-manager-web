@@ -3,37 +3,30 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { AlertCircle, ArrowLeft, MapPin, StickyNote, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, FileText, MapPin, StickyNote, Trash2, XCircle } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { Select } from "@/components/ui/Select";
 import { AddOrderPaymentForm } from "@/features/orders/components/AddOrderPaymentForm";
-import { deleteOrder, getOrderWithPayments, updateOrderStatus } from "@/lib/firebase/orders";
-import { Order, OrderStatus } from "@/types";
+import { cancelOrder, deleteOrder, getOrderWithPayments } from "@/lib/firebase/orders";
+import { Order } from "@/types";
 import { formatCurrencyBRL, formatDateBR, formatDateTimeBR } from "@/lib/utils/format";
 import { orderStatusLabel, orderStatusTone } from "@/lib/utils/order-status";
+import { buildOrderNoteData } from "@/lib/utils/simple-note";
+import { SimpleNoteModal } from "@/features/notes/components/SimpleNoteModal";
 import { paymentMethodLabel } from "@/lib/utils/payment-method";
 import { Badge } from "@/components/ui/Badge";
-
-const allStatuses: OrderStatus[] = [
-  "pendente",
-  "confirmada",
-  "em_producao",
-  "pronta",
-  "entregue",
-  "cancelada",
-];
 
 export default function OrderDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const [order, setOrder] = useState<Order | null | undefined>(undefined);
   const [error, setError] = useState(false);
-  const [statusSaving, setStatusSaving] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
+  const [noteOpen, setNoteOpen] = useState(false);
 
   async function load() {
     setError(false);
@@ -50,17 +43,6 @@ export default function OrderDetailPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
-
-  async function handleStatusChange(status: OrderStatus) {
-    if (!order) return;
-    setStatusSaving(true);
-    try {
-      await updateOrderStatus(order.id, status);
-      setOrder({ ...order, status });
-    } finally {
-      setStatusSaving(false);
-    }
-  }
 
   return (
     <AppShell title="Detalhe da encomenda">
@@ -158,7 +140,15 @@ export default function OrderDetailPage() {
             </div>
           </Card>
 
-          <div className="flex justify-end">
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button variant="secondary" size="sm" onClick={() => setNoteOpen(true)}>
+              <FileText className="h-4 w-4" /> Nota simples
+            </Button>
+            {order.status !== "finalizada" && order.status !== "cancelada" && (
+              <Button variant="danger" size="sm" onClick={() => setCancelConfirmOpen(true)}>
+                <XCircle className="h-4 w-4" /> Cancelar
+              </Button>
+            )}
             <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmOpen(true)}>
               <Trash2 className="h-4 w-4" /> Deletar encomenda
             </Button>
@@ -166,19 +156,15 @@ export default function OrderDetailPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Status</CardTitle>
+              <CardTitle>Status da encomenda</CardTitle>
             </CardHeader>
-            <Select
-              value={order.status}
-              disabled={statusSaving}
-              onChange={(e) => handleStatusChange(e.target.value as OrderStatus)}
-            >
-              {allStatuses.map((s) => (
-                <option key={s} value={s}>
-                  {orderStatusLabel[s]}
-                </option>
-              ))}
-            </Select>
+            <p className="text-sm text-ink-muted">
+              {order.status === "finalizada"
+                ? "Finalizada = entregue. O pagamento é controlado separadamente."
+                : order.status === "cancelada"
+                  ? "Cancelada — não realizada."
+                  : "Em produção — será finalizada quando o Dia de Venda for encerrado."}
+            </p>
           </Card>
 
           <Card>
@@ -217,6 +203,29 @@ export default function OrderDetailPage() {
             </Card>
           )}
         </div>
+      )}
+
+      {order && (
+        <SimpleNoteModal
+          open={noteOpen}
+          onClose={() => setNoteOpen(false)}
+          data={buildOrderNoteData(order)}
+        />
+      )}
+
+      {order && (
+        <ConfirmDialog
+          open={cancelConfirmOpen}
+          onClose={() => setCancelConfirmOpen(false)}
+          title="Cancelar encomenda"
+          description={"A encomenda de " + order.customerName + " será marcada como cancelada e deixará de representar uma entrega realizada."}
+          confirmLabel="Cancelar encomenda"
+          danger
+          onConfirm={async () => {
+            await cancelOrder(order.id);
+            await load();
+          }}
+        />
       )}
 
       {order && (

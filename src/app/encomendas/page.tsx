@@ -22,11 +22,8 @@ import { OrderStatus } from "@/types";
 
 const statusFilterOptions: (OrderStatus | "todas")[] = [
   "todas",
-  "pendente",
-  "confirmada",
   "em_producao",
-  "pronta",
-  "entregue",
+  "finalizada",
   "cancelada",
 ];
 
@@ -52,8 +49,7 @@ export default function EncomendasPage() {
   }, []);
 
   const term = search.toLowerCase();
-  // Encomendas pagas + entregues saem da lista principal (vão para o histórico),
-  // para não confundir com pedidos em aberto.
+  // Encomendas finalizadas saem da lista principal e ficam no histórico.
   const active = orders?.filter((o) => !isOrderCompleted(o));
   const filtered = active?.filter(
     (o) =>
@@ -109,7 +105,7 @@ export default function EncomendasPage() {
           href="/encomendas/historico"
           className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted hover:text-ink"
         >
-          <History className="h-3.5 w-3.5" /> Ver histórico (pagas e entregues)
+          <History className="h-3.5 w-3.5" /> Ver histórico (finalizadas)
         </Link>
       </div>
 
@@ -142,7 +138,7 @@ export default function EncomendasPage() {
           description={
             search || statusFilter !== "todas"
               ? "Tente ajustar a busca ou o filtro de status."
-              : "Registre uma nova encomenda, ou confira o histórico das já concluídas."
+              : "Registre uma nova encomenda, ou confira o histórico das já finalizadas."
           }
           actionLabel={search || statusFilter !== "todas" ? undefined : "+ Nova encomenda"}
           onAction={

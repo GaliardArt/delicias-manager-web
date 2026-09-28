@@ -6,12 +6,21 @@ import { LogOut } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { navItems } from "./nav-items";
 import { signOut } from "@/lib/firebase/auth";
-import { useUserProfile } from "@/hooks/useUserProfile";
+import type { UserProfile } from "@/lib/firebase/users";
 
-export function Sidebar() {
+interface SidebarProps {
+  profile: UserProfile | null;
+  fallbackName: string | null;
+  fallbackEmail: string | null;
+}
+
+export function Sidebar({
+  profile,
+  fallbackName,
+  fallbackEmail,
+}: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { profile, loading } = useUserProfile();
   const settingsItem = navItems.find((item) => item.href === "/configuracoes")!;
   const SettingsIcon = settingsItem.icon;
 
@@ -20,7 +29,7 @@ export function Sidebar() {
     router.push("/login");
   }
 
-  const visibleItems = loading || !profile
+  const visibleItems = !profile
     ? navItems.filter((item) => item.href === "/dashboard")
     : navItems.filter((item) => {
         if (item.href === "/perfil") return true;
@@ -28,13 +37,35 @@ export function Sidebar() {
         return profile.role === "admin" || profile.permissions[item.href.slice(1) as keyof typeof profile.permissions]?.view === true;
       });
 
+  const displayName =
+    profile?.name?.trim() ||
+    fallbackName?.trim() ||
+    profile?.email?.split("@")[0] ||
+    fallbackEmail?.split("@")[0] ||
+    "Usuário";
+
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-line bg-surface px-4 py-6 md:flex">
-      <div className="mb-8 flex items-center gap-2 px-2">
-        <span className="text-xl">🍰</span>
-        <span className="font-display text-lg font-semibold text-ink">
-          Delícias Manager
-        </span>
+      <div className="mb-5 flex flex-col gap-3">
+        <div className="flex items-center gap-2 px-2">
+          <span className="text-xl">🍰</span>
+          <span className="font-display text-lg font-semibold text-ink">
+            Delícias Manager
+          </span>
+        </div>
+
+        <div className="rounded-2xl bg-surface-muted px-3 py-2.5">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2.5 w-2.5 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success-500 opacity-50" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-success-500" />
+            </span>
+            <span className="min-w-0 truncate text-sm font-medium text-ink">
+              {displayName}
+            </span>
+            <span className="ml-auto text-[11px] font-medium text-success-700">Online</span>
+          </div>
+        </div>
       </div>
 
       <nav className="flex flex-1 flex-col gap-1">
@@ -75,7 +106,7 @@ export function Sidebar() {
         </Link>
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-ink-muted transition-colors hover:bg-surface-muted hover:text-danger-500"
+          className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink"
         >
           <LogOut className="h-[18px] w-[18px]" />
           Sair

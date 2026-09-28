@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { AlertCircle, ArrowLeft, Check, MapPin, ShoppingBag } from "lucide-react";
+import { AlertCircle, ArrowLeft, FileText, MapPin, ShoppingBag } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -16,11 +16,10 @@ import {
   closeDay,
 } from "@/lib/firebase/sales-days";
 import { summarizeSales, RawSale } from "@/lib/firebase/reports";
-import { addOrderPayment } from "@/lib/firebase/orders";
 import { Order } from "@/types";
 import { formatCurrencyBRL, formatDateBR } from "@/lib/utils/format";
-
-type Decision = "pago" | "fiado";
+import { buildOrderNoteData, SimpleNoteData } from "@/lib/utils/simple-note";
+import { SimpleNoteModal } from "@/features/notes/components/SimpleNoteModal";
 
 export default function FecharDiaDeVendaPage() {
   const params = useParams<{ date: string }>();
@@ -30,8 +29,7 @@ export default function FecharDiaDeVendaPage() {
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [sales, setSales] = useState<RawSale[]>([]);
   const [error, setError] = useState(false);
-  const [decisions, setDecisions] = useState<Record<string, Decision>>({});
-  const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
+  const [noteOrder, setNoteOrder] = useState<Order | null>(null);
   const [closing, setClosing] = useState(false);
 
   async function load() {
@@ -44,14 +42,6 @@ export default function FecharDiaDeVendaPage() {
       ]);
       setOrders(ordersData);
       setSales(salesData);
-      // Encomendas já totalmente pagas antes de abrir essa tela entram
-      // pré-marcadas como "Pago" — só falta decidir o que realmente está em
-      // aberto.
-      const initialDecisions: Record<string, Decision> = {};
-      for (const order of ordersData) {
-        if (order.pendingCents <= 0) initialDecisions[order.id] = "pago";
-      }
-      setDecisions(initialDecisions);
     } catch (err) {
       console.error(err);
       setError(true);
@@ -75,32 +65,7 @@ export default function FecharDiaDeVendaPage() {
     }
   }
 
-  async function handleDecision(order: Order, decision: Decision) {
-    if (!orders) return;
-    setPendingOrderId(order.id);
-
-    let updatedOrder = order;
-    try {
-      if (decision === "pago" && order.pendingCents > 0) {
-        await addOrderPayment(order.id, order.pendingCents, "dinheiro");
-        updatedOrder = { ...order, paidCents: order.totalCents, pendingCents: 0 };
-      }
-
-      const updatedOrders = orders.map((o) => (o.id === order.id ? updatedOrder : o));
-      const newDecisions = { ...decisions, [order.id]: decision };
-
-      setOrders(updatedOrders);
-      setDecisions(newDecisions);
-      setPendingOrderId(null);
-    } catch (err) {
-      console.error(err);
-      setPendingOrderId(null);
-      setError(true);
-    }
-  }
-
   const addressGroups = orders ? groupOrdersByAddress(orders) : [];
-  const decidedCount = orders ? orders.filter((o) => decisions[o.id]).length : 0;
   const salesSummary = summarizeSales(sales);
   const nothingToShow = orders !== null && orders.length === 0 && sales.length === 0;
 
@@ -143,17 +108,14 @@ export default function FecharDiaDeVendaPage() {
           <Card>
             <CardHeader>
               <CardTitle>{formatDateBR(date)}</CardTitle>
-              {orders.length > 0 && (
-                <Badge tone={decidedCount === orders.length ? "success" : "brand"}>
-                  {decidedCount} de {orders.length} confirmadas
-                </Badge>
-              )}
+              {orders.length > 0 && <Badge tone="brand">{orders.length} encomendas</Badge>}
             </CardHeader>
             {orders.length > 0 ? (
               <p className="text-sm text-ink-muted">
-                Marque cada encomenda como <strong>Pago</strong> (registra o pagamento
-                do valor pendente agora) ou <strong>Falta pagar</strong> (fica como
-                fiado). Depois que todas estiverem marcadas, use o botão abaixo para encerrar o dia.
+                Ao encerrar o Dia de Venda, todas as encomendas ativas desta data serão
+                marcadas como <strong>Finalizada</strong>, o que significa que foram
+                entregues. O pagamento continua separado: o que não foi recebido
+                permanece como pendente/fiado e pode ser quitado depois.
               </p>
             ) : (
               <p className="text-sm text-ink-muted">
@@ -224,54 +186,36 @@ export default function FecharDiaDeVendaPage() {
 
           {orders.length > 0 && (
             <div className="flex flex-col gap-3">
-              {orders.map((order) => {
-                const decision = decisions[order.id];
-                const isBusy = pendingOrderId === order.id || closing;
-                return (
-                  <Card key={order.id}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-ink">
-                          {order.customerName}
-                        </p>
-                        <p className="text-xs text-ink-muted">
-                          {order.items.map((i) => `${i.quantity}x ${i.productName}`).join(", ")}
-                        </p>
-                        <p className="mt-1 text-xs text-ink-muted">
-                          Total {formatCurrencyBRL(order.totalCents)} · Pendente{" "}
-                          {formatCurrencyBRL(order.pendingCents)}
-                        </p>
-                      </div>
-
-                      {decision ? (
-                        <Badge tone={decision === "pago" ? "success" : "warning"}>
-                          <Check className="mr-1 h-3 w-3" />
-                          {decision === "pago" ? "Pago" : "Falta pagar"}
-                        </Badge>
-                      ) : (
-                        <div className="flex shrink-0 gap-2">
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            disabled={isBusy}
-                            onClick={() => handleDecision(order, "fiado")}
-                          >
-                            Falta pagar
-                          </Button>
-                          <Button
-                            size="sm"
-                            loading={pendingOrderId === order.id}
-                            disabled={isBusy}
-                            onClick={() => handleDecision(order, "pago")}
-                          >
-                            Pago
-                          </Button>
-                        </div>
-                      )}
+              {orders.map((order) => (
+                <Card key={order.id}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-ink">{order.customerName}</p>
+                      <p className="text-xs text-ink-muted">
+                        {order.items.map((i) => String(i.quantity) + "x " + i.productName).join(", ")}
+                      </p>
+                      <p className="mt-1 text-xs text-ink-muted">
+                        Total {formatCurrencyBRL(order.totalCents)} · Recebido{" "}
+                        {formatCurrencyBRL(order.paidCents)} · Pendente{" "}
+                        {formatCurrencyBRL(order.pendingCents)}
+                      </p>
                     </div>
-                  </Card>
-                );
-              })}
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={closing}
+                        onClick={() => setNoteOrder(order)}
+                      >
+                        <FileText className="h-4 w-4" /> Nota
+                      </Button>
+                      <Badge tone={order.pendingCents > 0 ? "warning" : "success"}>
+                        {order.pendingCents > 0 ? "Pendente" : "Pago"}
+                      </Badge>
+                    </div>
+                  </div>
+                </Card>
+              ))}
             </div>
           )}
 
@@ -280,17 +224,10 @@ export default function FecharDiaDeVendaPage() {
               size="lg"
               className="w-full"
               loading={closing}
-              disabled={decidedCount !== orders.length}
               onClick={() => finishClosing(orders)}
             >
               <ShoppingBag className="h-4 w-4" /> Fechar dia
             </Button>
-          )}
-
-          {orders.length > 0 && decidedCount !== orders.length && (
-            <p className="text-center text-xs text-ink-muted">
-              Marque todas as encomendas como Pago ou Falta pagar antes de fechar o dia.
-            </p>
           )}
 
           {orders.length === 0 && sales.length > 0 && (
@@ -307,6 +244,27 @@ export default function FecharDiaDeVendaPage() {
           {closing && (
             <p className="text-center text-sm text-ink-muted">Encerrando o dia...</p>
           )}
+
+          <SimpleNoteModal
+            open={noteOrder !== null}
+            onClose={() => setNoteOrder(null)}
+            data={
+              noteOrder
+                ? buildOrderNoteData(noteOrder)
+                : ({
+                    kindLabel: "Encomenda",
+                    referenceId: "",
+                    dateLabel: "",
+                    customerName: "",
+                    items: [],
+                    subtotalCents: 0,
+                    discountCents: 0,
+                    totalCents: 0,
+                    paidCents: 0,
+                    pendingCents: 0,
+                  } satisfies SimpleNoteData)
+            }
+          />
         </div>
       )}
     </AppShell>
