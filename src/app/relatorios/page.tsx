@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   AlertCircle,
   BarChart3,
@@ -116,7 +116,7 @@ function MetricCard({
   label: string;
   value: string;
   icon: typeof DollarSign;
-  detail?: string;
+  detail?: ReactNode;
   tone?: "default" | "success" | "warning" | "danger";
 }) {
   const toneClass =
@@ -605,7 +605,7 @@ export default function RelatoriosPage() {
   }
 
   function exportCurrentTab() {
-    const filenameBase = "relatorio-" + tab + "-" + period.start.toISOString().slice(0, 10) + "-" + period.end.toISOString().slice(0, 10);
+    const filenameBase = "relatorio-" + tab + "-" + period.start.toISOString().slice(0, 10) + "-" + new Date(period.end.getTime() - 86400000).toISOString().slice(0, 10);
 
     if (tab === "produtos" || tab === "abc") {
       const data = tab === "abc" ? abc : productsByRevenue;
