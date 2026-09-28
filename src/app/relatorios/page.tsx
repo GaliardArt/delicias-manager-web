@@ -758,6 +758,7 @@ export default function RelatoriosPage() {
             >
               <option value="hoje">Hoje</option>
               <option value="semana">Últimos 7 dias</option>
+              <option value="mes_atual">Este mês</option>
               <option value="mes">Últimos 30 dias</option>
               <option value="mes_anterior">Mês anterior</option>
               <option value="trimestre">Últimos 90 dias</option>
