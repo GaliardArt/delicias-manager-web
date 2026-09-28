@@ -12,6 +12,73 @@
   ::selection {
     @apply bg-brand-100 text-brand-800;
   }
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+    transition-duration: 180ms;
+  }
+}
+
+@keyframes dm-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dm-welcome-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.88) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes dm-welcome-copy {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@layer utilities {
+  .animate-page-in {
+    animation: dm-page-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .animate-welcome-pop {
+    animation: dm-welcome-pop 650ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .animate-welcome-copy {
+    animation: dm-welcome-copy 700ms 120ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @layer utilities {
