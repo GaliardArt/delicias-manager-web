@@ -680,6 +680,8 @@ export interface CustomerMetrics extends CustomerRanking {
   pendingCents: number;
   discountCents: number;
   frequencyDays: number | null;
+  favoriteProductName: string | null;
+  favoriteProductQuantity: number;
 }
 
 export function buildCustomerMetrics(
@@ -736,6 +738,18 @@ export function buildCustomerMetrics(
       null
     );
     const pendingCents = globalSales.reduce((sum, sale) => sum + Math.max(0, sale.pendingCents), 0);
+    const productQuantities = new Map<string, number>();
+    for (const sale of globalSales) {
+      for (const item of sale.items) {
+        productQuantities.set(
+          item.productName,
+          (productQuantities.get(item.productName) ?? 0) + item.quantity
+        );
+      }
+    }
+    const favoriteProductEntry = Array.from(productQuantities.entries()).sort(
+      (a, b) => b[1] - a[1]
+    )[0];
 
     const dates = globalSales
       .map((sale) => sale.createdAt.getTime())
@@ -759,6 +773,8 @@ export function buildCustomerMetrics(
       pendingCents,
       discountCents,
       frequencyDays,
+      favoriteProductName: favoriteProductEntry?.[0] ?? null,
+      favoriteProductQuantity: favoriteProductEntry?.[1] ?? 0,
     };
   }).filter((customer) => customer.purchaseCount > 0);
 }
