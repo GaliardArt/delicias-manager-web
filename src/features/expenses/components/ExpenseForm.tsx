@@ -130,7 +130,7 @@ export function ExpenseForm({ onSuccess, expense }: ExpenseFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex max-h-[75vh] flex-col gap-3 overflow-y-auto pr-1">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       <Input
         label="Descrição"
         value={description}
