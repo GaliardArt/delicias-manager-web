@@ -603,7 +603,7 @@ export default function ContasPage() {
             </Card>
           )}
 
-          <Card className="mt-4">
+          <Card className={"mt-4 " + (periodExpenses.length === 0 ? "hidden" : "")}>
             <CardHeader>
               <div>
                 <CardTitle>Lançamentos</CardTitle>
