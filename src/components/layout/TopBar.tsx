@@ -2,16 +2,27 @@
 
 import { Settings } from "lucide-react";
 import Link from "next/link";
-import { useUserProfile } from "@/hooks/useUserProfile";
+import type { UserProfile } from "@/lib/firebase/users";
 
 interface TopBarProps {
   title: string;
+  profile: UserProfile | null;
+  fallbackName: string | null;
+  fallbackEmail: string | null;
 }
 
-export function TopBar({ title }: TopBarProps) {
-  const { profile } = useUserProfile();
+export function TopBar({
+  title,
+  profile,
+  fallbackName,
+  fallbackEmail,
+}: TopBarProps) {
   const displayName =
-    profile?.name?.trim() || profile?.email?.split("@")[0] || "Usuário";
+    profile?.name?.trim() ||
+    fallbackName?.trim() ||
+    profile?.email?.split("@")[0] ||
+    fallbackEmail?.split("@")[0] ||
+    "Usuário";
 
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-surface/95 px-4 py-3.5 backdrop-blur md:hidden">
