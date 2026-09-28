@@ -419,24 +419,33 @@ export default function ContasPage() {
           </p>
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <Select
-            label="Período"
-            value={periodKey}
-            onChange={(event) =>
-              setPeriodKey(event.target.value as PeriodKey)
-            }
-            className="sm:w-48"
-          >
-            <option value="hoje">Hoje</option>
-            <option value="semana">Últimos 7 dias</option>
-            <option value="mes">Últimos 30 dias</option>
-            <option value="personalizado">Personalizado</option>
-          </Select>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="w-full sm:w-48">
+            <label
+              htmlFor="contas-periodo"
+              className="mb-1.5 block text-sm font-medium text-ink-muted"
+            >
+              Período
+            </label>
+            <Select
+              id="contas-periodo"
+              aria-label="Período"
+              value={periodKey}
+              onChange={(event) =>
+                setPeriodKey(event.target.value as PeriodKey)
+              }
+              className="w-full"
+            >
+              <option value="hoje">Hoje</option>
+              <option value="semana">Últimos 7 dias</option>
+              <option value="mes">Últimos 30 dias</option>
+              <option value="personalizado">Personalizado</option>
+            </Select>
+          </div>
 
           <Button
             size="lg"
-            className="w-full sm:w-auto"
+            className="h-11 w-full sm:w-auto"
             onClick={openCreateModal}
           >
             <Plus className="h-4 w-4" />
