@@ -10,14 +10,12 @@ import type { UserProfile } from "@/lib/firebase/users";
 
 interface SidebarProps {
   profile: UserProfile | null;
-  loading: boolean;
   fallbackName: string | null;
   fallbackEmail: string | null;
 }
 
 export function Sidebar({
   profile,
-  loading,
   fallbackName,
   fallbackEmail,
 }: SidebarProps) {
