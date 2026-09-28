@@ -522,6 +522,16 @@ export default function RelatoriosPage() {
     [products, insumos, ingredientes]
   );
 
+  const currentProductCostById = useMemo(
+    () =>
+      new Map(
+        inventory.items
+          .filter((item) => item.kind === "produto")
+          .map((item) => [item.id, item.unitCostCents])
+      ),
+    [inventory]
+  );
+
   const consumption = useMemo(
     () => estimateInsumoConsumption(current, products, insumos, ingredientes),
     [current, products, insumos, ingredientes]
@@ -1055,12 +1065,15 @@ export default function RelatoriosPage() {
             <Card>
               <SectionTitle title="Rentabilidade detalhada" description="A receita dos itens recebe rateio proporcional do desconto da venda para preservar a margem líquida por produto." />
               <DataTable
-                headers={["Produto", "Qtd.", "Receita líquida", "Custo", "Lucro", "Margem", "Variação qtd."]}
+                headers={["Produto", "Qtd.", "Receita líquida", "Custo vendido", "Custo atual", "Lucro", "Margem", "Variação qtd."]}
                 rows={productsByRevenue.map((item) => [
                   <span key={item.productId ?? item.name} className="font-medium text-ink">{item.name}</span>,
                   numberBR(item.quantity),
                   formatCurrencyBRL(item.revenueCents),
                   formatCurrencyBRL(item.costCents),
+                  item.productId && currentProductCostById.has(item.productId)
+                    ? formatCurrencyBRL(currentProductCostById.get(item.productId) ?? 0)
+                    : "—",
                   formatCurrencyBRL(item.profitCents),
                   pct(item.marginPct),
                   <Delta key="delta" value={item.quantityChangePct} />,
@@ -1136,13 +1149,14 @@ export default function RelatoriosPage() {
             <Card>
               <SectionTitle title="Clientes por receita" description="Receita líquida das vendas do período." />
               <DataTable
-                headers={["Cliente", "Pedidos", "Receita", "Ticket", "Itens", "Pendente", "Descontos", "Frequência"]}
+                headers={["Cliente", "Pedidos", "Receita", "Ticket", "Itens", "Produto mais comprado", "Pendente", "Descontos", "Frequência"]}
                 rows={customersByRevenue.map((customer) => [
                   <span key={customer.id} className="font-medium text-ink">{customer.name}</span>,
                   customer.purchaseCount,
                   formatCurrencyBRL(customer.totalCents),
                   formatCurrencyBRL(customer.averageTicketCents),
                   numberBR(customer.quantityItems),
+                  customer.favoriteProductName ? customer.favoriteProductName + " (" + numberBR(customer.favoriteProductQuantity) + " un)" : "—",
                   formatCurrencyBRL(customer.pendingCents),
                   formatCurrencyBRL(customer.discountCents),
                   customer.frequencyDays !== null ? customer.frequencyDays + " dias" : "—",
