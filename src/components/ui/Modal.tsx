@@ -38,7 +38,7 @@ export function Modal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex min-h-dvh items-end justify-center overflow-hidden bg-ink/40 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-50 flex min-h-dvh items-center justify-center overflow-hidden bg-ink/40 p-4 backdrop-blur-sm">
       <button
         aria-label="Fechar"
         className="absolute inset-0 cursor-default"
@@ -47,7 +47,7 @@ export function Modal({
 
       <div
         className={cn(
-          "relative flex max-h-[90dvh] w-full min-h-0 flex-col overflow-hidden rounded-t-2xl bg-surface shadow-soft sm:rounded-2xl",
+          "relative flex max-h-[calc(100dvh-2rem)] w-full min-h-0 flex-col overflow-hidden rounded-2xl bg-surface shadow-soft",
           maxWidthClassName
         )}
       >
