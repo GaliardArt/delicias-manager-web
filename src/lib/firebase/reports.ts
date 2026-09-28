@@ -511,7 +511,13 @@ export function computeTrends(current: RawSale[], previous: RawSale[]): Trends {
       : null;
 
   const weekdayCounts = new Array<number>(7).fill(0);
-  for (const sale of current) weekdayCounts[sale.createdAt.getDay()] += 1;
+  for (const sale of current) {
+    const weekday = sale.createdAt.getDay();
+    const count = weekdayCounts[weekday];
+    if (count !== undefined) {
+      weekdayCounts[weekday] = count + 1;
+    }
+  }
   const maxCount = Math.max(...weekdayCounts);
   const busiestWeekday =
     maxCount > 0 ? weekdayNames[weekdayCounts.indexOf(maxCount)] ?? null : null;
