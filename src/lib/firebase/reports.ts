@@ -118,6 +118,7 @@ export type PeriodKey =
   | "hoje"
   | "semana"
   | "mes"
+  | "mes_atual"
   | "mes_anterior"
   | "trimestre"
   | "personalizado";
@@ -154,6 +155,13 @@ export function getPeriodPreset(
     const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
     const end = new Date(today.getFullYear(), today.getMonth(), 1);
     return { key, label: "Mês anterior", start, end };
+  }
+
+  if (key === "mes_atual") {
+    const start = new Date(today.getFullYear(), today.getMonth(), 1);
+    const end = new Date(today);
+    end.setDate(end.getDate() + 1);
+    return { key, label: "Este mês", start, end };
   }
 
   if (key === "trimestre") {
@@ -756,7 +764,14 @@ export function buildCustomerMetrics(
       .sort((a, b) => a - b);
     let frequencyDays: number | null = null;
     if (dates.length >= 2) {
-      const gaps = dates.slice(1).map((value, index) => value - dates[index]);
+      const gaps: number[] = [];
+      for (let index = 1; index < dates.length; index += 1) {
+        const previousDate = dates[index - 1];
+        const currentDate = dates[index];
+        if (previousDate !== undefined && currentDate !== undefined) {
+          gaps.push(currentDate - previousDate);
+        }
+      }
       const avgGap = gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length;
       frequencyDays = Math.max(0, Math.round(avgGap / 86400000));
     }
