@@ -6,12 +6,16 @@ import { LogOut } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { navItems } from "./nav-items";
 import { signOut } from "@/lib/firebase/auth";
-import { useUserProfile } from "@/hooks/useUserProfile";
+import type { UserProfile } from "@/lib/firebase/users";
 
-export function Sidebar() {
+interface SidebarProps {
+  profile: UserProfile | null;
+  loading: boolean;
+}
+
+export function Sidebar({ profile, loading }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { profile, loading } = useUserProfile();
   const settingsItem = navItems.find((item) => item.href === "/configuracoes")!;
   const SettingsIcon = settingsItem.icon;
 
