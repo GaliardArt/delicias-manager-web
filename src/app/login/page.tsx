@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -19,10 +19,11 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [welcomeName, setWelcomeName] = useState<string | null>(null);
   const [welcomeFadingOut, setWelcomeFadingOut] = useState(false);
+  const welcomeActiveRef = useRef(false);
 
   // Já logado? Não faz sentido mostrar o formulário de novo.
   useEffect(() => {
-    if (!authLoading && user && !welcomeName) {
+    if (!authLoading && user && !welcomeActiveRef.current && !welcomeName) {
       router.replace("/dashboard");
     }
   }, [authLoading, user, router, welcomeName]);
@@ -33,6 +34,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const signedInUser = await signIn(email, password);
+      welcomeActiveRef.current = true;
       let name =
         signedInUser.displayName?.trim() ||
         email.split("@")[0]?.trim() ||
