@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -17,9 +17,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Já logado? Não faz sentido mostrar o formulário de novo.
+  const loginSubmitRef = useRef(false);
+
+  // Usuário que já estava autenticado deve ser redirecionado normalmente.
+  // Durante um login iniciado pelo botão "Entrar", aguardamos o fluxo terminar
+  // para não chegar ao dashboard antes de gravar a mensagem de boas-vindas.
   useEffect(() => {
-    if (!authLoading && user) {
+    if (!authLoading && user && !loginSubmitRef.current) {
       router.replace("/dashboard");
     }
   }, [authLoading, user, router]);
@@ -28,6 +32,8 @@ export default function LoginPage() {
     event.preventDefault();
     setError(null);
     setLoading(true);
+    loginSubmitRef.current = true;
+
     try {
       const signedInUser = await signIn(email, password);
       let name =
@@ -55,10 +61,11 @@ export default function LoginPage() {
       } catch (storageError) {
         console.error(storageError);
       }
+
       router.replace("/dashboard");
-      return;
     } catch (err) {
       console.error(err);
+      loginSubmitRef.current = false;
       setError("E-mail ou senha incorretos. Tente novamente.");
     } finally {
       setLoading(false);
