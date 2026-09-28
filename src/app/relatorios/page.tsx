@@ -23,6 +23,7 @@ import {
   TriangleAlert,
   Users,
   Wallet,
+  Receipt,
   type LucideIcon,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
@@ -850,7 +851,7 @@ export default function RelatoriosPage() {
               <MetricCard label="Lucro bruto" value={formatCurrencyBRL(summary.lucroBrutoCents)} icon={TrendingUp} tone={summary.lucroBrutoCents >= 0 ? "success" : "danger"} />
               <MetricCard label="Despesas" value={formatCurrencyBRL(expensesCents)} icon={Wallet} tone="danger" detail={<Delta value={previousExpensesCents > 0 ? ((expensesCents - previousExpensesCents) / previousExpensesCents) * 100 : null} />} />
               <MetricCard label="Vendas" value={String(summary.quantidadeVendas)} icon={ShoppingCart} detail={summary.quantidadeItens + " itens vendidos"} />
-              <MetricCard label="Ticket médio" value={formatCurrencyBRL(summary.ticketMedioCents)} icon={ReceiptIcon} detail={<Delta value={trends.ticketChangePct} />} />
+              <MetricCard label="Ticket médio" value={formatCurrencyBRL(summary.ticketMedioCents)} icon={Receipt} detail={<Delta value={trends.ticketChangePct} />} />
             </div>
 
             <Card>
@@ -1448,8 +1449,4 @@ export default function RelatoriosPage() {
     if (denominator === 0) return null;
     return ((lucroLiquidoCents - previousLucroLiquidoCents) / denominator) * 100;
   }
-}
-
-function ReceiptIcon(props: { className?: string }) {
-  return <DollarSign {...props} />;
 }
