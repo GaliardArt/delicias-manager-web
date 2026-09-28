@@ -23,6 +23,7 @@ import {
   TriangleAlert,
   Users,
   Wallet,
+  type LucideIcon,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -115,7 +116,7 @@ function MetricCard({
 }: {
   label: string;
   value: string;
-  icon: typeof DollarSign;
+  icon: LucideIcon;
   detail?: ReactNode;
   tone?: "default" | "success" | "warning" | "danger";
 }) {
@@ -233,7 +234,7 @@ function DataTable({
   empty = "Sem dados.",
 }: {
   headers: string[];
-  rows: (string | number | React.ReactNode)[][];
+  rows: (string | number | ReactNode)[][];
   empty?: string;
 }) {
   if (rows.length === 0) {
