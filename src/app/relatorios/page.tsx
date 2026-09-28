@@ -323,7 +323,7 @@ export default function RelatoriosPage() {
   const [ingredientes, setIngredientes] = useState<Ingrediente[]>([]);
   const [error, setError] = useState(false);
   const [tab, setTab] = useState<ReportTab>("visao");
-  const [periodKey, setPeriodKey] = useState<PeriodKey>("mes");
+  const [periodKey, setPeriodKey] = useState<PeriodKey>("mes_atual");
   const [customStart, setCustomStart] = useState(todayLocalIso());
   const [customEnd, setCustomEnd] = useState(todayLocalIso());
   const [copied, setCopied] = useState(false);
