@@ -31,7 +31,7 @@ export function Sidebar({
     router.push("/login");
   }
 
-  const visibleItems = loading || !profile
+  const visibleItems = !profile
     ? navItems.filter((item) => item.href === "/dashboard")
     : navItems.filter((item) => {
         if (item.href === "/perfil") return true;
@@ -48,11 +48,26 @@ export function Sidebar({
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-line bg-surface px-4 py-6 md:flex">
-      <div className="mb-8 flex items-center gap-2 px-2">
-        <span className="text-xl">🍰</span>
-        <span className="font-display text-lg font-semibold text-ink">
-          Delícias Manager
-        </span>
+      <div className="mb-5 flex flex-col gap-3">
+        <div className="flex items-center gap-2 px-2">
+          <span className="text-xl">🍰</span>
+          <span className="font-display text-lg font-semibold text-ink">
+            Delícias Manager
+          </span>
+        </div>
+
+        <div className="rounded-2xl bg-surface-muted px-3 py-2.5">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2.5 w-2.5 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success-500 opacity-50" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-success-500" />
+            </span>
+            <span className="min-w-0 truncate text-sm font-medium text-ink">
+              {displayName}
+            </span>
+            <span className="ml-auto text-[11px] font-medium text-success-700">Online</span>
+          </div>
+        </div>
       </div>
 
       <nav className="flex flex-1 flex-col gap-1">
@@ -77,19 +92,6 @@ export function Sidebar({
             );
           })}
       </nav>
-
-      <div className="mb-3 rounded-2xl bg-surface-muted px-3 py-2.5">
-        <div className="flex items-center gap-2">
-          <span className="relative flex h-2.5 w-2.5 shrink-0">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success-500 opacity-50" />
-            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-success-500" />
-          </span>
-          <span className="min-w-0 truncate text-sm font-medium text-ink">
-            {displayName}
-          </span>
-          <span className="ml-auto text-[11px] font-medium text-success-700">Online</span>
-        </div>
-      </div>
 
       <div className="flex flex-col gap-1 border-t border-line pt-4">
         <Link
