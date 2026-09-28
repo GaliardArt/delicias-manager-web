@@ -11,9 +11,16 @@ import type { UserProfile } from "@/lib/firebase/users";
 interface SidebarProps {
   profile: UserProfile | null;
   loading: boolean;
+  fallbackName: string | null;
+  fallbackEmail: string | null;
 }
 
-export function Sidebar({ profile, loading }: SidebarProps) {
+export function Sidebar({
+  profile,
+  loading,
+  fallbackName,
+  fallbackEmail,
+}: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const settingsItem = navItems.find((item) => item.href === "/configuracoes")!;
@@ -31,6 +38,13 @@ export function Sidebar({ profile, loading }: SidebarProps) {
         if (item.href === "/admin") return profile.role === "admin";
         return profile.role === "admin" || profile.permissions[item.href.slice(1) as keyof typeof profile.permissions]?.view === true;
       });
+
+  const displayName =
+    profile?.name?.trim() ||
+    fallbackName?.trim() ||
+    profile?.email?.split("@")[0] ||
+    fallbackEmail?.split("@")[0] ||
+    "Usuário";
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-line bg-surface px-4 py-6 md:flex">
@@ -71,7 +85,7 @@ export function Sidebar({ profile, loading }: SidebarProps) {
             <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-success-500" />
           </span>
           <span className="min-w-0 truncate text-sm font-medium text-ink">
-            {profile?.name?.trim() || profile?.email?.split("@")[0] || "Usuário"}
+            {displayName}
           </span>
           <span className="ml-auto text-[11px] font-medium text-success-700">Online</span>
         </div>
@@ -92,7 +106,7 @@ export function Sidebar({ profile, loading }: SidebarProps) {
         </Link>
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-ink-muted transition-colors hover:bg-surface-muted hover:text-danger-500"
+          className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink"
         >
           <LogOut className="h-[18px] w-[18px]" />
           Sair
