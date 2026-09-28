@@ -7,6 +7,7 @@ import { Sidebar } from "./Sidebar";
 import { BottomNav } from "./BottomNav";
 import { TopBar } from "./TopBar";
 import { useAuth } from "@/hooks/useAuth";
+import { PostLoginWelcome } from "./PostLoginWelcome";
 
 interface AppShellProps {
   title: string;
@@ -47,6 +48,7 @@ export function AppShell({ title, children }: AppShellProps) {
         </main>
       </div>
       <BottomNav />
+      <PostLoginWelcome />
     </div>
   );
 }
