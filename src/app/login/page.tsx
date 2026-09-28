@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { signIn } from "@/lib/firebase/auth";
+import { signIn, syncCurrentUserDisplayName } from "@/lib/firebase/auth";
 import { ensureCurrentUserProfile } from "@/lib/firebase/users";
 import { POST_LOGIN_WELCOME_KEY } from "@/components/layout/PostLoginWelcome";
 import { useAuth } from "@/hooks/useAuth";
@@ -42,6 +42,12 @@ export default function LoginPage() {
         }
       } catch (profileError) {
         console.error(profileError);
+      }
+
+      try {
+        await syncCurrentUserDisplayName(name);
+      } catch (authProfileError) {
+        console.error(authProfileError);
       }
 
       try {
