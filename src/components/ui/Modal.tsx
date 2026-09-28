@@ -47,7 +47,7 @@ export function Modal({
 
       <div
         className={cn(
-          "relative flex max-h-[calc(100dvh-2rem)] w-full min-h-0 flex-col overflow-hidden rounded-2xl bg-surface shadow-soft",
+          "relative flex h-[calc(100dvh-2rem)] max-h-[720px] w-full min-h-0 flex-col overflow-hidden rounded-2xl bg-surface shadow-soft",
           maxWidthClassName
         )}
       >
