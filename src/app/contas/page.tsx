@@ -32,9 +32,17 @@ import {
   listAllExpenses,
   updateExpense,
 } from "@/lib/firebase/expenses";
-import { getPeriodPreset, getCustomPeriod, PeriodKey } from "@/lib/firebase/reports";
+import {
+  getCustomPeriod,
+  getPeriodPreset,
+  PeriodKey,
+} from "@/lib/firebase/reports";
 import { Expense, ExpenseKind, ExpenseStatus } from "@/types";
-import { formatCurrencyBRL, formatDateBR, todayLocalIso } from "@/lib/utils/format";
+import {
+  formatCurrencyBRL,
+  formatDateBR,
+  todayLocalIso,
+} from "@/lib/utils/format";
 
 type StatusFilter = "todos" | ExpenseStatus | "vencido";
 type KindFilter = "todos" | ExpenseKind;
@@ -127,6 +135,7 @@ export default function ContasPage() {
   async function load(showSkeleton = true) {
     setError(false);
     if (showSkeleton) setExpenses(null);
+
     try {
       setExpenses(await listAllExpenses());
     } catch (err) {
@@ -139,49 +148,48 @@ export default function ContasPage() {
     load();
   }, []);
 
-  const period = useMemo(
-    () =>
-      periodKey === "personalizado"
-        ? getCustomPeriod(customStart, customEnd)
-        : getPeriodPreset(periodKey),
-    [periodKey, customStart, customEnd]
-  );
+  const period = useMemo(() => {
+    if (periodKey === "personalizado") {
+      return getCustomPeriod(customStart, customEnd);
+    }
+    return getPeriodPreset(periodKey);
+  }, [periodKey, customStart, customEnd]);
 
-  const previousPeriod = useMemo(
-    () => ({
-      start: new Date(
-        period.start.getTime() - (period.end.getTime() - period.start.getTime())
-      ),
+  const previousPeriod = useMemo(() => {
+    const duration = period.end.getTime() - period.start.getTime();
+    return {
+      start: new Date(period.start.getTime() - duration),
       end: period.start,
-    }),
-    [period]
-  );
+    };
+  }, [period]);
 
-  const periodExpenses = useMemo(
-    () =>
+  const periodExpenses = useMemo(() => {
+    return (
       expenses?.filter((expense) => {
         const date = new Date(expense.date + "T00:00:00");
         return date >= period.start && date < period.end;
-      }) ?? [],
-    [expenses, period]
-  );
+      }) ?? []
+    );
+  }, [expenses, period]);
 
-  const previousPeriodExpenses = useMemo(
-    () =>
+  const previousPeriodExpenses = useMemo(() => {
+    return (
       expenses?.filter((expense) => {
         const date = new Date(expense.date + "T00:00:00");
         return date >= previousPeriod.start && date < previousPeriod.end;
-      }) ?? [],
-    [expenses, previousPeriod]
-  );
+      }) ?? []
+    );
+  }, [expenses, previousPeriod]);
 
-  const categoryOptions = useMemo(
-    () =>
-      Array.from(
-        new Set((expenses ?? []).map((expense) => expense.category).filter(Boolean))
-      ).sort((a, b) => a.localeCompare(b, "pt-BR")),
-    [expenses]
-  );
+  const categoryOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        (expenses ?? [])
+          .map((expense) => expense.category)
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [expenses]);
 
   const total = useMemo(
     () => periodExpenses.reduce((sum, expense) => sum + expense.amountCents, 0),
@@ -189,7 +197,11 @@ export default function ContasPage() {
   );
 
   const previousTotal = useMemo(
-    () => previousPeriodExpenses.reduce((sum, expense) => sum + expense.amountCents, 0),
+    () =>
+      previousPeriodExpenses.reduce(
+        (sum, expense) => sum + expense.amountCents,
+        0
+      ),
     [previousPeriodExpenses]
   );
 
@@ -225,19 +237,23 @@ export default function ContasPage() {
     [periodExpenses]
   );
 
-  const largestExpense = useMemo(
-    () =>
-      periodExpenses.reduce<Expense | null>(
-        (largest, expense) =>
-          !largest || expense.amountCents > largest.amountCents ? expense : largest,
-        null
-      ),
-    [periodExpenses]
-  );
+  const largestExpense = useMemo(() => {
+    return periodExpenses.reduce<Expense | null>(
+      (largest, expense) => {
+        if (!largest || expense.amountCents > largest.amountCents) {
+          return expense;
+        }
+        return largest;
+      },
+      null
+    );
+  }, [periodExpenses]);
 
   const periodDays = Math.max(
     1,
-    Math.ceil((period.end.getTime() - period.start.getTime()) / 86400000)
+    Math.ceil(
+      (period.end.getTime() - period.start.getTime()) / 86400000
+    )
   );
   const dailyAverage = total > 0 ? Math.round(total / periodDays) : 0;
   const variation = variationPct(total, previousTotal);
@@ -258,8 +274,10 @@ export default function ContasPage() {
 
         const matchesSearch =
           !normalizedSearch || haystack.includes(normalizedSearch);
+
         const matchesCategory =
-          categoryFilter === "todas" || expense.category === categoryFilter;
+          categoryFilter === "todas" ||
+          expense.category === categoryFilter;
 
         const overdue = isExpenseOverdue(expense, today);
         const matchesStatus =
@@ -269,16 +287,28 @@ export default function ContasPage() {
             : expense.status === statusFilter);
 
         const matchesKind =
-          kindFilter === "todos" || (expense.kind ?? "variavel") === kindFilter;
+          kindFilter === "todos" ||
+          (expense.kind ?? "variavel") === kindFilter;
 
-        return matchesSearch && matchesCategory && matchesStatus && matchesKind;
+        return (
+          matchesSearch &&
+          matchesCategory &&
+          matchesStatus &&
+          matchesKind
+        );
       })
       .sort((a, b) => {
         const dateCompare = b.date.localeCompare(a.date);
         if (dateCompare !== 0) return dateCompare;
         return b.amountCents - a.amountCents;
       });
-  }, [periodExpenses, search, categoryFilter, statusFilter, kindFilter]);
+  }, [
+    periodExpenses,
+    search,
+    categoryFilter,
+    statusFilter,
+    kindFilter,
+  ]);
 
   const categoryBreakdown = useMemo(() => {
     const map = new Map<string, number>();
@@ -308,24 +338,29 @@ export default function ContasPage() {
         (expense) =>
           expense.status === "pendente" &&
           Boolean(expense.dueDate) &&
-          expense.dueDate! >= today &&
-          expense.dueDate! <= limit
+          (expense.dueDate ?? "") >= today &&
+          (expense.dueDate ?? "") <= limit
       )
-      .sort((a, b) => (a.dueDate ?? "").localeCompare(b.dueDate ?? ""));
+      .sort((a, b) =>
+        (a.dueDate ?? "").localeCompare(b.dueDate ?? "")
+      );
   }, [expenses]);
 
   const upcoming = upcomingAll.slice(0, 6);
 
-  const globalOverdue = useMemo(
-    () =>
-      (expenses ?? []).filter((expense) =>
-        isExpenseOverdue(expense, todayLocalIso())
-      ),
-    [expenses]
-  );
+  const globalOverdue = useMemo(() => {
+    const today = todayLocalIso();
+    return (expenses ?? []).filter((expense) =>
+      isExpenseOverdue(expense, today)
+    );
+  }, [expenses]);
 
   const globalOverdueTotal = useMemo(
-    () => globalOverdue.reduce((sum, expense) => sum + expense.amountCents, 0),
+    () =>
+      globalOverdue.reduce(
+        (sum, expense) => sum + expense.amountCents,
+        0
+      ),
     [globalOverdue]
   );
 
@@ -360,10 +395,25 @@ export default function ContasPage() {
     }
   }
 
+  async function confirmDelete() {
+    if (!deletingId) return;
+
+    try {
+      await deleteExpense(deletingId);
+      setDeletingId(null);
+      await load(false);
+    } catch (err) {
+      console.error(err);
+      setError(true);
+    }
+  }
+
+  const hasPeriodExpenses = periodExpenses.length > 0;
+
   return (
     <AppShell title="Contas">
       <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div>
+        <div className="min-w-0">
           <p className="text-sm text-ink-muted">
             Controle de despesas, contas a pagar e impacto dos gastos no negócio.
           </p>
@@ -373,7 +423,9 @@ export default function ContasPage() {
           <Select
             label="Período"
             value={periodKey}
-            onChange={(e) => setPeriodKey(e.target.value as PeriodKey)}
+            onChange={(event) =>
+              setPeriodKey(event.target.value as PeriodKey)
+            }
             className="sm:w-48"
           >
             <option value="hoje">Hoje</option>
@@ -381,8 +433,14 @@ export default function ContasPage() {
             <option value="mes">Últimos 30 dias</option>
             <option value="personalizado">Personalizado</option>
           </Select>
-          <Button size="lg" className="w-full sm:w-auto" onClick={openCreateModal}>
-            <Plus className="h-4 w-4" /> Nova conta
+
+          <Button
+            size="lg"
+            className="w-full sm:w-auto"
+            onClick={openCreateModal}
+          >
+            <Plus className="h-4 w-4" />
+            Nova conta
           </Button>
         </div>
       </div>
@@ -393,14 +451,14 @@ export default function ContasPage() {
             type="date"
             aria-label="Início do período"
             value={customStart}
-            onChange={(e) => setCustomStart(e.target.value)}
+            onChange={(event) => setCustomStart(event.target.value)}
             className="h-11 rounded-xl border border-line bg-surface px-3.5 text-sm"
           />
           <input
             type="date"
             aria-label="Fim do período"
             value={customEnd}
-            onChange={(e) => setCustomEnd(e.target.value)}
+            onChange={(event) => setCustomEnd(event.target.value)}
             className="h-11 rounded-xl border border-line bg-surface px-3.5 text-sm"
           />
         </div>
@@ -408,8 +466,11 @@ export default function ContasPage() {
 
       {expenses === null && !error && (
         <div className="flex flex-col gap-3">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-24 animate-pulse rounded-2xl bg-surface-muted" />
+          {[...Array(5)].map((_, index) => (
+            <div
+              key={index}
+              className="h-24 animate-pulse rounded-2xl bg-surface-muted"
+            />
           ))}
         </div>
       )}
@@ -432,23 +493,32 @@ export default function ContasPage() {
                 <div className="mt-0.5 rounded-xl bg-warning-100 p-2 text-warning-700">
                   <AlertTriangle className="h-4 w-4" />
                 </div>
+
                 <div className="min-w-0">
-                  <p className="font-medium text-warning-800">Atenção financeira</p>
+                  <p className="font-medium text-warning-800">
+                    Atenção financeira
+                  </p>
                   <p className="mt-1 text-sm text-warning-700">
-                    {globalOverdue.length > 0
-                      ? globalOverdue.length +
-                        (globalOverdue.length === 1 ? " conta vencida" : " contas vencidas") +
-                        " (" +
-                        formatCurrencyBRL(globalOverdueTotal) +
-                        ")"
-                      : ""}
-                    {globalOverdue.length > 0 && upcomingAll.length > 0 ? " · " : ""}
-                    {upcomingAll.length > 0
-                      ? upcomingAll.length +
-                        (upcomingAll.length === 1
-                          ? " conta vence nos próximos 30 dias"
-                          : " contas vencem nos próximos 30 dias")
-                      : ""}
+                    {globalOverdue.length > 0 && (
+                      <>
+                        {globalOverdue.length}{" "}
+                        {globalOverdue.length === 1
+                          ? "conta vencida"
+                          : "contas vencidas"}{" "}
+                        ({formatCurrencyBRL(globalOverdueTotal)})
+                      </>
+                    )}
+
+                    {globalOverdue.length > 0 && upcomingAll.length > 0 && " · "}
+
+                    {upcomingAll.length > 0 && (
+                      <>
+                        {upcomingAll.length}{" "}
+                        {upcomingAll.length === 1
+                          ? "conta vence nos próximos 30 dias"
+                          : "contas vencem nos próximos 30 dias"}
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
@@ -469,6 +539,7 @@ export default function ContasPage() {
               icon={TrendingDown}
               tone="danger"
             />
+
             <Metric
               label="Em aberto"
               value={formatCurrencyBRL(pendingTotal)}
@@ -480,12 +551,18 @@ export default function ContasPage() {
               icon={Clock3}
               tone="warning"
             />
+
             <Metric
               label="Média por dia"
               value={formatCurrencyBRL(dailyAverage)}
-              detail={periodDays + (periodDays === 1 ? " dia" : " dias") + " no período"}
+              detail={
+                periodDays +
+                (periodDays === 1 ? " dia" : " dias") +
+                " no período"
+              }
               icon={BarChart3}
             />
+
             <Metric
               label="Maior gasto"
               value={formatCurrencyBRL(largestExpense?.amountCents ?? 0)}
@@ -500,25 +577,32 @@ export default function ContasPage() {
                 <div>
                   <CardTitle>Gastos por categoria</CardTitle>
                   <p className="mt-1 text-xs text-ink-muted">
-                    Onde o dinheiro está sendo consumido em {period.label.toLowerCase()}.
+                    Onde o dinheiro está sendo consumido em{" "}
+                    {period.label.toLowerCase()}.
                   </p>
                 </div>
                 <Tags className="h-4 w-4 text-ink-faint" />
               </CardHeader>
 
               {categoryBreakdown.length === 0 ? (
-                <p className="text-sm text-ink-muted">Nenhum gasto no período.</p>
+                <p className="text-sm text-ink-muted">
+                  Nenhum gasto no período.
+                </p>
               ) : (
                 <div className="flex flex-col gap-3">
                   {categoryBreakdown.slice(0, 8).map((item) => {
-                    const width = total > 0 ? (item.amountCents / total) * 100 : 0;
+                    const width =
+                      total > 0 ? (item.amountCents / total) * 100 : 0;
 
                     return (
                       <div key={item.category}>
                         <div className="mb-1 flex items-center justify-between gap-3 text-xs">
-                          <span className="truncate font-medium text-ink">{item.category}</span>
+                          <span className="truncate font-medium text-ink">
+                            {item.category}
+                          </span>
                           <span className="shrink-0 text-ink-muted">
-                            {formatCurrencyBRL(item.amountCents)} · {item.sharePct.toFixed(1)}%
+                            {formatCurrencyBRL(item.amountCents)} ·{" "}
+                            {item.sharePct.toFixed(1)}%
                           </span>
                         </div>
                         <div className="h-2 overflow-hidden rounded-full bg-surface-muted">
@@ -552,16 +636,23 @@ export default function ContasPage() {
                     {formatCurrencyBRL(fixedTotal)}
                   </p>
                   <p className="mt-1 text-xs text-ink-faint">
-                    {total > 0 ? ((fixedTotal / total) * 100).toFixed(1) : "0,0"}%
+                    {total > 0
+                      ? ((fixedTotal / total) * 100).toFixed(1)
+                      : "0,0"}
+                    %
                   </p>
                 </div>
+
                 <div className="rounded-2xl bg-surface-muted p-3">
                   <p className="text-xs text-ink-muted">Variáveis</p>
                   <p className="mt-1 font-display text-lg font-semibold text-ink">
                     {formatCurrencyBRL(variableTotal)}
                   </p>
                   <p className="mt-1 text-xs text-ink-faint">
-                    {total > 0 ? ((variableTotal / total) * 100).toFixed(1) : "0,0"}%
+                    {total > 0
+                      ? ((variableTotal / total) * 100).toFixed(1)
+                      : "0,0"}
+                    %
                   </p>
                 </div>
               </div>
@@ -589,13 +680,16 @@ export default function ContasPage() {
                     className="rounded-2xl border border-line bg-surface p-3 text-left transition hover:bg-surface-muted"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <p className="truncate text-sm font-medium text-ink">{expense.description}</p>
+                      <p className="truncate text-sm font-medium text-ink">
+                        {expense.description}
+                      </p>
                       <span className="shrink-0 text-sm font-semibold text-warning-700">
                         {formatCurrencyBRL(expense.amountCents)}
                       </span>
                     </div>
                     <p className="mt-1 text-xs text-ink-muted">
-                      Vence em {formatDateBR(expense.dueDate ?? expense.date)}
+                      Vence em{" "}
+                      {formatDateBR(expense.dueDate ?? expense.date)}
                     </p>
                   </button>
                 ))}
@@ -603,174 +697,205 @@ export default function ContasPage() {
             </Card>
           )}
 
-          <Card className={"mt-4 " + (periodExpenses.length === 0 ? "hidden" : "")}>
-            <CardHeader>
-              <div>
-                <CardTitle>Lançamentos</CardTitle>
-                <p className="mt-1 text-xs text-ink-muted">
-                  {filtered.length}{" "}
-                  {filtered.length === 1
-                    ? "lançamento encontrado"
-                    : "lançamentos encontrados"}
-                  .
+          {hasPeriodExpenses && (
+            <Card className="mt-4">
+              <CardHeader>
+                <div>
+                  <CardTitle>Lançamentos</CardTitle>
+                  <p className="mt-1 text-xs text-ink-muted">
+                    {filtered.length}{" "}
+                    {filtered.length === 1
+                      ? "lançamento encontrado"
+                      : "lançamentos encontrados"}
+                    .
+                  </p>
+                </div>
+                <Filter className="h-4 w-4 text-ink-faint" />
+              </CardHeader>
+
+              <div className="mb-4 grid gap-3 md:grid-cols-[1.5fr_repeat(3,minmax(0,1fr))]">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
+                  <input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Buscar por descrição, categoria..."
+                    className="h-11 w-full rounded-xl border border-line bg-surface pl-9 pr-3.5 text-sm outline-none transition placeholder:text-ink-faint focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                  />
+                </div>
+
+                <Select
+                  aria-label="Filtrar categoria"
+                  label="Categoria"
+                  value={categoryFilter}
+                  onChange={(event) =>
+                    setCategoryFilter(event.target.value)
+                  }
+                >
+                  <option value="todas">Todas</option>
+                  {categoryOptions.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </Select>
+
+                <Select
+                  aria-label="Filtrar status"
+                  label="Status"
+                  value={statusFilter}
+                  onChange={(event) =>
+                    setStatusFilter(event.target.value as StatusFilter)
+                  }
+                >
+                  <option value="todos">Todos</option>
+                  <option value="pago">Pagos</option>
+                  <option value="pendente">Pendentes</option>
+                  <option value="vencido">Vencidos</option>
+                </Select>
+
+                <Select
+                  aria-label="Filtrar tipo"
+                  label="Tipo"
+                  value={kindFilter}
+                  onChange={(event) =>
+                    setKindFilter(event.target.value as KindFilter)
+                  }
+                >
+                  <option value="todos">Todos</option>
+                  <option value="fixa">Fixas</option>
+                  <option value="variavel">Variáveis</option>
+                </Select>
+              </div>
+
+              {filtered.length === 0 && (
+                <p className="rounded-2xl bg-surface-muted px-4 py-8 text-center text-sm text-ink-muted">
+                  Nenhum lançamento corresponde aos filtros atuais.
                 </p>
-              </div>
-              <Filter className="h-4 w-4 text-ink-faint" />
-            </CardHeader>
+              )}
 
-            <div className="mb-4 grid gap-3 md:grid-cols-[1.5fr_repeat(3,minmax(0,1fr))]">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Buscar por descrição, categoria..."
-                  className="h-11 w-full rounded-xl border border-line bg-surface pl-9 pr-3.5 text-sm outline-none transition placeholder:text-ink-faint focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
-                />
-              </div>
+              {filtered.length > 0 && (
+                <div className="overflow-x-auto">
+                  <div className="min-w-[760px]">
+                    <div className="grid grid-cols-[1.6fr_1fr_.8fr_.8fr_auto] gap-3 border-b border-line px-2 pb-2 text-[11px] font-medium uppercase tracking-wide text-ink-faint">
+                      <span>Despesa</span>
+                      <span>Categoria</span>
+                      <span>Data</span>
+                      <span>Status</span>
+                      <span className="text-right">Valor</span>
+                    </div>
 
-              <Select
-                aria-label="Filtrar categoria"
-                label="Categoria"
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-              >
-                <option value="todas">Todas</option>
-                {categoryOptions.map((category) => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
-              </Select>
+                    <ul className="divide-y divide-line">
+                      {filtered.map((expense) => {
+                        const today = todayLocalIso();
+                        const overdue = isExpenseOverdue(expense, today);
 
-              <Select
-                aria-label="Filtrar status"
-                label="Status"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-              >
-                <option value="todos">Todos</option>
-                <option value="pago">Pagos</option>
-                <option value="pendente">Pendentes</option>
-                <option value="vencido">Vencidos</option>
-              </Select>
-
-              <Select
-                aria-label="Filtrar tipo"
-                label="Tipo"
-                value={kindFilter}
-                onChange={(e) => setKindFilter(e.target.value as KindFilter)}
-              >
-                <option value="todos">Todos</option>
-                <option value="fixa">Fixas</option>
-                <option value="variavel">Variáveis</option>
-              </Select>
-            </div>
-
-            {filtered.length === 0 && periodExpenses.length > 0 ? (
-              <p className="rounded-2xl bg-surface-muted px-4 py-8 text-center text-sm text-ink-muted">
-                Nenhum lançamento corresponde aos filtros atuais.
-              </p>
-            ) : filtered.length > 0 ? (
-              <div className="overflow-x-auto">
-                <div className="min-w-[760px]">
-                  <div className="grid grid-cols-[1.6fr_1fr_.8fr_.8fr_auto] gap-3 border-b border-line px-2 pb-2 text-[11px] font-medium uppercase tracking-wide text-ink-faint">
-                    <span>Despesa</span>
-                    <span>Categoria</span>
-                    <span>Data</span>
-                    <span>Status</span>
-                    <span className="text-right">Valor</span>
-                  </div>
-
-                  <ul className="divide-y divide-line">
-                    {filtered.map((expense) => {
-                      const today = todayLocalIso();
-                      const overdue = isExpenseOverdue(expense, today);
-
-                      return (
-                        <li
-                          key={expense.id}
-                          className="grid grid-cols-[1.6fr_1fr_.8fr_.8fr_auto] items-center gap-3 px-2 py-3.5"
-                        >
-                          <div className="min-w-0">
-                            <button
-                              type="button"
-                              onClick={() => openEditModal(expense)}
-                              className="block max-w-full truncate text-left text-sm font-medium text-ink hover:text-brand-700"
-                            >
-                              {expense.description}
-                            </button>
-                            <div className="mt-1 flex items-center gap-2">
-                              <span className="text-xs text-ink-faint">
-                                {kindLabel[expense.kind ?? "variavel"]}
-                              </span>
-                              {expense.recurrence && expense.recurrence !== "nenhuma" && (
-                                <span className="text-xs text-ink-faint">
-                                  · {expense.recurrence}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          <span className="truncate text-xs text-ink-muted">
-                            {expense.category}
-                          </span>
-
-                          <div className="text-xs text-ink-muted">
-                            <p>{formatDateBR(expense.date)}</p>
-                            <p className="mt-0.5 text-[11px] text-ink-faint">
-                              vence {formatDateBR(expense.dueDate ?? expense.date)}
-                            </p>
-                          </div>
-
-                          <Badge tone={statusTone(expense, today)}>
-                            {overdue ? "Vencido" : statusLabel[expense.status ?? "pago"]}
-                          </Badge>
-
-                          <div className="flex items-center justify-end gap-1.5">
-                            <span className="whitespace-nowrap text-sm font-semibold text-danger-700">
-                              {formatCurrencyBRL(expense.amountCents)}
-                            </span>
-
-                            {expense.status === "pendente" && (
+                        return (
+                          <li
+                            key={expense.id}
+                            className="grid grid-cols-[1.6fr_1fr_.8fr_.8fr_auto] items-center gap-3 px-2 py-3.5"
+                          >
+                            <div className="min-w-0">
                               <button
                                 type="button"
-                                onClick={() => markAsPaid(expense)}
-                                className="rounded-lg p-1.5 text-success-700 hover:bg-success-50"
-                                aria-label="Marcar como pago"
-                                title="Marcar como pago"
+                                onClick={() => openEditModal(expense)}
+                                className="block max-w-full truncate text-left text-sm font-medium text-ink hover:text-brand-700"
                               >
-                                <CheckCircle2 className="h-4 w-4" />
+                                {expense.description}
                               </button>
-                            )}
 
-                            <button
-                              type="button"
-                              onClick={() => openEditModal(expense)}
-                              className="rounded-lg p-1.5 text-ink-faint hover:bg-surface-muted hover:text-ink"
-                              aria-label="Editar conta"
-                              title="Editar"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </button>
+                              <div className="mt-1 flex items-center gap-2">
+                                <span className="text-xs text-ink-faint">
+                                  {kindLabel[expense.kind ?? "variavel"]}
+                                </span>
 
-                            <button
-                              type="button"
-                              onClick={() => setDeletingId(expense.id)}
-                              className="rounded-lg p-1.5 text-ink-faint hover:bg-danger-50 hover:text-danger-500"
-                              aria-label="Excluir conta"
-                              title="Excluir"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                                {expense.recurrence &&
+                                  expense.recurrence !== "nenhuma" && (
+                                    <span className="text-xs text-ink-faint">
+                                      · {expense.recurrence}
+                                    </span>
+                                  )}
+                              </div>
+                            </div>
+
+                            <span className="truncate text-xs text-ink-muted">
+                              {expense.category}
+                            </span>
+
+                            <div className="text-xs text-ink-muted">
+                              <p>{formatDateBR(expense.date)}</p>
+                              <p className="mt-0.5 text-[11px] text-ink-faint">
+                                vence{" "}
+                                {formatDateBR(
+                                  expense.dueDate ?? expense.date
+                                )}
+                              </p>
+                            </div>
+
+                            <Badge tone={statusTone(expense, today)}>
+                              {overdue
+                                ? "Vencido"
+                                : statusLabel[expense.status ?? "pago"]}
+                            </Badge>
+
+                            <div className="flex items-center justify-end gap-1.5">
+                              <span className="whitespace-nowrap text-sm font-semibold text-danger-700">
+                                {formatCurrencyBRL(expense.amountCents)}
+                              </span>
+
+                              {expense.status === "pendente" && (
+                                <button
+                                  type="button"
+                                  onClick={() => markAsPaid(expense)}
+                                  className="rounded-lg p-1.5 text-success-700 hover:bg-success-50"
+                                  aria-label="Marcar como pago"
+                                  title="Marcar como pago"
+                                >
+                                  <CheckCircle2 className="h-4 w-4" />
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => openEditModal(expense)}
+                                className="rounded-lg p-1.5 text-ink-faint hover:bg-surface-muted hover:text-ink"
+                                aria-label="Editar conta"
+                                title="Editar"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => setDeletingId(expense.id)}
+                                className="rounded-lg p-1.5 text-ink-faint hover:bg-danger-50 hover:text-danger-500"
+                                aria-label="Excluir conta"
+                                title="Excluir"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
                 </div>
-              </div>
-            )}
-          </Card>
+              )}
+            </Card>
+          )}
 
+          {!hasPeriodExpenses && (
+            <div className="mt-4">
+              <EmptyState
+                icon={Receipt}
+                title="Nenhuma conta nesse período"
+                description="Registre gasolina, compra de insumos, energia, aluguel e outras despesas do negócio."
+                actionLabel="+ Nova conta"
+                onAction={openCreateModal}
+              />
+            </div>
+          )}
         </>
       )}
 
@@ -799,18 +924,7 @@ export default function ContasPage() {
         description="Essa ação não pode ser desfeita."
         confirmLabel="Excluir"
         danger
-        onConfirm={async () => {
-          if (!deletingId) return;
-
-          try {
-            await deleteExpense(deletingId);
-            setDeletingId(null);
-            await load(false);
-          } catch (err) {
-            console.error(err);
-            setError(true);
-          }
-        }}
+        onConfirm={confirmDelete}
       />
     </AppShell>
   );
