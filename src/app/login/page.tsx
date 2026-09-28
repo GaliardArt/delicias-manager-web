@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { signIn } from "@/lib/firebase/auth";
-import { getUserProfile } from "@/lib/firebase/users";
+import { ensureCurrentUserProfile } from "@/lib/firebase/users";
 import { POST_LOGIN_WELCOME_KEY } from "@/components/layout/PostLoginWelcome";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -17,8 +17,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-
   // Já logado? Não faz sentido mostrar o formulário de novo.
   useEffect(() => {
     if (!authLoading && user) {
@@ -38,7 +36,7 @@ export default function LoginPage() {
         "usuário";
 
       try {
-        const profile = await getUserProfile(signedInUser.uid);
+        const profile = await ensureCurrentUserProfile();
         if (profile?.name?.trim()) {
           name = profile.name.trim();
         }
