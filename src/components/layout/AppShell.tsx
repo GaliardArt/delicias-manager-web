@@ -20,7 +20,7 @@ interface AppShellProps {
 // em vez de mandar para /login.
 export function AppShell({ title, children }: AppShellProps) {
   const { user, loading } = useAuth();
-  const { profile, loading: profileLoading } = useUserProfile();
+  const { profile } = useUserProfile();
   const router = useRouter();
 
   useEffect(() => {
@@ -41,7 +41,6 @@ export function AppShell({ title, children }: AppShellProps) {
     <div className="flex min-h-dvh bg-bg">
       <Sidebar
         profile={profile}
-        loading={profileLoading}
         fallbackName={user.displayName}
         fallbackEmail={user.email}
       />
