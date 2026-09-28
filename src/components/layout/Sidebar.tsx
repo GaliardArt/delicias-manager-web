@@ -60,6 +60,19 @@ export function Sidebar() {
           })}
       </nav>
 
+      <div className="mb-3 rounded-2xl bg-surface-muted px-3 py-2.5">
+        <div className="flex items-center gap-2">
+          <span className="relative flex h-2.5 w-2.5 shrink-0">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success-500 opacity-50" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-success-500" />
+          </span>
+          <span className="min-w-0 truncate text-sm font-medium text-ink">
+            {profile?.name?.trim() || profile?.email?.split("@")[0] || "Usuário"}
+          </span>
+          <span className="ml-auto text-[11px] font-medium text-success-700">Online</span>
+        </div>
+      </div>
+
       <div className="flex flex-col gap-1 border-t border-line pt-4">
         <Link
           href="/configuracoes"
