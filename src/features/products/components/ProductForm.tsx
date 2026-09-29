@@ -7,9 +7,10 @@ import { Select } from "@/components/ui/Select";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { Button } from "@/components/ui/Button";
 import { RecipeBuilder } from "@/features/recipes/components/RecipeBuilder";
-import { Ingrediente, Insumo, Product, RecipeItem } from "@/types";
+import { ExtraCostMode, Ingrediente, Insumo, Product, RecipeItem } from "@/types";
 import { createProduct, updateProduct } from "@/lib/firebase/products";
 import {
+  getProductExtraCost,
   resolveProductCost,
   resolveProductCostPerGram,
   resolveProductTotalWeightGrams,
@@ -17,6 +18,7 @@ import {
   toIngredientesMap,
 } from "@/lib/costing";
 import { formatCurrencyBRL } from "@/lib/utils/format";
+import { shouldAutoFocus } from "@/lib/utils/device";
 
 const unitOptions = ["unidade", "caixa", "pacote", "kg", "dúzia"];
 
@@ -36,19 +38,35 @@ export function ProductForm({ product, insumos, ingredientes, onSuccess }: Produ
   const [priceCents, setPriceCents] = useState(product?.priceCents ?? 0);
   const [description, setDescription] = useState(product?.description ?? "");
   const [recipeItems, setRecipeItems] = useState<RecipeItem[]>(product?.recipeItems ?? []);
+  const [extraCostCents, setExtraCostCents] = useState(getProductExtraCost(product ?? {}).cents);
+  const [extraCostMode, setExtraCostMode] = useState<ExtraCostMode>(
+    getProductExtraCost(product ?? {}).mode
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const extraCost = useMemo(
+    () => ({ cents: extraCostCents, mode: extraCostMode }),
+    [extraCostCents, extraCostMode]
+  );
   const previewCost = useMemo(
     () =>
       resolveProductCost(
         recipeItems,
         toInsumosMap(insumos),
         toIngredientesMap(ingredientes),
-        yieldQuantity
+        yieldQuantity,
+        extraCost
       ),
-    [recipeItems, insumos, ingredientes, yieldQuantity]
+    [recipeItems, insumos, ingredientes, yieldQuantity, extraCost]
   );
+  // Só existe algo a mostrar no preview se há receita OU custo adicional.
+  const hasCostInfo = recipeItems.length > 0 || extraCostCents > 0;
+  // Quanto o custo adicional pesa em cada unidade (útil no modo "por receita").
+  const extraCostPerUnit =
+    yieldQuantity > 0
+      ? Math.round((extraCostMode === "receita" ? extraCostCents / yieldQuantity : extraCostCents))
+      : 0;
   const previewMargin = priceCents - previewCost;
   const previewMarginPct = priceCents > 0 ? (previewMargin / priceCents) * 100 : 0;
   const previewCostPerGram =
@@ -58,7 +76,8 @@ export function ProductForm({ product, insumos, ingredientes, onSuccess }: Produ
           toInsumosMap(insumos),
           toIngredientesMap(ingredientes),
           yieldQuantity,
-          yieldWeightGrams
+          yieldWeightGrams,
+          extraCost
         )
       : 0;
   const previewTotalWeightGrams = resolveProductTotalWeightGrams(
@@ -94,6 +113,8 @@ export function ProductForm({ product, insumos, ingredientes, onSuccess }: Produ
         priceCents,
         description: description.trim(),
         recipeItems,
+        extraCostCents,
+        extraCostMode,
       };
       if (product) {
         await updateProduct(product.id, input);
@@ -109,92 +130,135 @@ export function ProductForm({ product, insumos, ingredientes, onSuccess }: Produ
     }
   }
 
+  const sectionTitle = "text-xs font-semibold uppercase tracking-wide text-ink-muted";
+
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-      <Input
-        label="Nome"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="Brigadeiro gourmet"
-        autoFocus
-      />
-      <Input
-        label="Categoria"
-        value={category}
-        onChange={(e) => setCategory(e.target.value)}
-        placeholder="Doces, Bolos, Biscoitos..."
-      />
-      <div className="grid grid-cols-2 gap-3">
-        <MoneyInput label="Preço de venda" valueCents={priceCents} onValueCentsChange={setPriceCents} />
-        <Select label="Unidade" value={unit} onChange={(e) => setUnit(e.target.value)}>
-          {unitOptions.map((u) => (
-            <option key={u} value={u}>
-              {u}
-            </option>
-          ))}
-        </Select>
-      </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+      {/* --- Informações básicas --- */}
+      <section className="flex flex-col gap-3">
+        <h3 className={sectionTitle}>Informações</h3>
+        <Input
+          label="Nome"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Brigadeiro gourmet"
+          autoFocus={shouldAutoFocus()}
+        />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Input
+            label="Categoria"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            placeholder="Doces, Bolos, Biscoitos..."
+          />
+          <Input
+            label="Descrição (opcional)"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Detalhes do produto"
+          />
+        </div>
+      </section>
+
+      {/* --- Preço e rendimento --- */}
+      <section className="flex flex-col gap-3">
+        <h3 className={sectionTitle}>Preço e rendimento</h3>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <MoneyInput label="Preço de venda" valueCents={priceCents} onValueCentsChange={setPriceCents} />
+          <Select label="Unidade" value={unit} onChange={(e) => setUnit(e.target.value)}>
+            {unitOptions.map((u) => (
+              <option key={u} value={u}>
+                {u}
+              </option>
+            ))}
+          </Select>
           <Input
             label="Rendimento"
             type="number"
+            inputMode="decimal"
             min={0}
             step="any"
             value={yieldQuantity}
             onChange={(e) => setYieldQuantity(Number(e.target.value))}
           />
-          <p className="mt-1.5 text-xs text-ink-muted">
-            Ex: essa receita rende {yieldQuantity || 0} {unit}.
-          </p>
-        </div>
-        <div>
           <Input
-            label="Peso de cada unidade (g)"
+            label="Peso/unid. (g)"
             type="number"
+            inputMode="decimal"
             min={0}
             step="any"
             value={yieldWeightGrams || ""}
             onChange={(e) => setYieldWeightGrams(Number(e.target.value))}
             placeholder="Ex.: 100"
           />
-          <p className="mt-1.5 text-xs text-ink-muted">
-            Informe para calcular peso total e custo por grama.
+        </div>
+        <p className="text-xs text-ink-muted">
+          Essa receita rende {yieldQuantity || 0} {unit}. Informe o peso de cada unidade para
+          calcular peso total e custo por grama.
+        </p>
+      </section>
+
+      {/* --- Receita --- */}
+      <section className="flex flex-col gap-3">
+        <div>
+          <h3 className={sectionTitle}>Receita (opcional)</h3>
+          <p className="mt-1 text-xs text-ink-muted">
+            Deixe vazio se não quiser calcular o custo pela receita.
           </p>
         </div>
-      </div>
-      <Input
-        label="Descrição (opcional)"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        placeholder="Detalhes do produto"
-      />
-
-      <div>
-        <p className="mb-1.5 text-sm font-medium text-ink-muted">
-          Receita (opcional — deixe vazio se não quiser calcular o custo)
-        </p>
         <RecipeBuilder
           insumos={insumos}
           ingredientes={ingredientes}
           value={recipeItems}
           onChange={setRecipeItems}
         />
-      </div>
+      </section>
 
-      {recipeItems.length > 0 && (
-        <div className="grid grid-cols-2 gap-3 rounded-xl bg-babypink px-3.5 py-3 text-sm sm:grid-cols-4">
-          <div>
+      {/* --- Custo adicional --- */}
+      <section className="flex flex-col gap-3">
+        <div>
+          <h3 className={sectionTitle}>Custo adicional (opcional)</h3>
+          <p className="mt-1 text-xs text-ink-muted">
+            Para gastos que não estão na receita: embalagem, gás, mão de obra, etc.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2">
+          <MoneyInput
+            label="Valor"
+            valueCents={extraCostCents}
+            onValueCentsChange={setExtraCostCents}
+          />
+          <Select
+            label="Como cobrar"
+            value={extraCostMode}
+            onChange={(e) => setExtraCostMode(e.target.value as ExtraCostMode)}
+          >
+            <option value="unidade">Por unidade</option>
+            <option value="receita">Por receita</option>
+          </Select>
+        </div>
+        {extraCostCents > 0 && (
+          <p className="text-xs text-ink-muted">
+            {extraCostMode === "receita"
+              ? `Diluído no rendimento: ${formatCurrencyBRL(extraCostPerUnit)} por ${unit}.`
+              : `Somado ao custo de cada ${unit}.`}
+          </p>
+        )}
+      </section>
+
+      {hasCostInfo && (
+        <div className="grid grid-cols-2 gap-x-3 gap-y-3 rounded-xl bg-babypink px-3.5 py-3 text-sm sm:grid-cols-4">
+          <div className="min-w-0">
             <span className="block text-brand-700">Custo / unidade</span>
             <span className="font-semibold text-brand-800">{formatCurrencyBRL(previewCost)}</span>
           </div>
-          <div>
+          <div className="min-w-0">
             <span className="block text-brand-700">Custo / grama</span>
             <span className="font-semibold text-brand-800">
               {yieldWeightGrams > 0 ? formatCurrencyBRL(previewCostPerGram) : "—"}
             </span>
           </div>
-          <div>
+          <div className="min-w-0">
             <span className="block text-brand-700">Peso total</span>
             <span className="font-semibold text-brand-800">
               {previewTotalWeightGrams > 0
@@ -202,7 +266,7 @@ export function ProductForm({ product, insumos, ingredientes, onSuccess }: Produ
                 : "—"}
             </span>
           </div>
-          <div>
+          <div className="min-w-0">
             <span className="block text-brand-700">Margem</span>
             <span className="font-semibold text-brand-800">
               {formatCurrencyBRL(previewMargin)} ({previewMarginPct.toFixed(0)}%)
@@ -216,9 +280,16 @@ export function ProductForm({ product, insumos, ingredientes, onSuccess }: Produ
           <AlertCircle className="h-4 w-4 shrink-0" /> {error}
         </p>
       )}
-      <Button type="submit" loading={submitting} className="mt-1 w-full">
-        {product ? "Salvar alterações" : "Cadastrar produto"}
-      </Button>
+
+      {/* Botão fixo no rodapé da área rolável: nunca some embaixo do formulário. */}
+      <div
+        className="sticky bottom-0 -mx-4 border-t border-line bg-surface px-4 pt-3 sm:-mx-5 sm:px-5"
+        style={{ marginBottom: "calc(-1 * max(1rem, env(safe-area-inset-bottom)))", paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
+      >
+        <Button type="submit" loading={submitting} className="w-full">
+          {product ? "Salvar alterações" : "Cadastrar produto"}
+        </Button>
+      </div>
     </form>
   );
 }
