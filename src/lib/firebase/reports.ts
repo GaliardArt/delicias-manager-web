@@ -3,6 +3,7 @@ import { db } from "./config";
 import { Customer, Ingrediente, Insumo, Product, OrderStatus } from "@/types";
 import { normalizeOrderStatus } from "@/lib/utils/order-status";
 import {
+  getProductExtraCost,
   resolveProductCost,
   resolveRecipeCost,
   toIngredientesMap,
@@ -898,7 +899,8 @@ export function buildInventorySummary(
       product.recipeItems ?? [],
       insumosById,
       ingredientesById,
-      product.yieldQuantity || 1
+      product.yieldQuantity || 1,
+      getProductExtraCost(product)
     );
     const quantity = Number(product.stockQuantity ?? 0);
     const stockValueCents = Math.round(quantity * unitCostCents);
