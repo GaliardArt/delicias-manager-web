@@ -8,7 +8,7 @@
 // brigadeiro, que por sua vez usa leite condensado + cacau). Isso é
 // resolvido recursivamente, com proteção contra referência circular.
 
-import { Ingrediente, Insumo, RecipeItem } from "@/types";
+import { ExtraCostMode, Ingrediente, Insumo, Product, RecipeItem } from "@/types";
 
 export function resolveIngredienteUnitCost(
   ingrediente: Ingrediente,
@@ -49,17 +49,45 @@ export function resolveRecipeCost(
   }, 0);
 }
 
-// Custo de uma unidade do Produto final = custo total da receita dividido pelo
-// rendimento do produto. Produtos antigos sem rendimento continuam equivalentes
-// ao comportamento anterior usando rendimento 1.
+// Custo adicional opcional de um produto (embalagem, gás, mão de obra...).
+export interface ProductExtraCost {
+  cents: number;
+  mode: ExtraCostMode;
+}
+
+// Extrai o custo adicional de um Product tolerando dados antigos (sem os campos).
+export function getProductExtraCost(
+  product: Partial<Pick<Product, "extraCostCents" | "extraCostMode">>
+): ProductExtraCost {
+  return {
+    cents: Math.max(0, Number(product.extraCostCents ?? 0)),
+    mode: product.extraCostMode === "receita" ? "receita" : "unidade",
+  };
+}
+
+// Custo adicional TOTAL de uma receita inteira (antes de dividir pelo rendimento).
+export function resolveExtraCostTotal(
+  yieldQuantity: number,
+  extraCost?: ProductExtraCost
+): number {
+  if (!extraCost || extraCost.cents <= 0 || yieldQuantity <= 0) return 0;
+  return extraCost.mode === "receita" ? extraCost.cents : extraCost.cents * yieldQuantity;
+}
+
+// Custo de uma unidade do Produto final = (custo total da receita + custo adicional)
+// dividido pelo rendimento do produto. Produtos antigos sem rendimento continuam
+// equivalentes ao comportamento anterior usando rendimento 1, e sem custo adicional
+// (parâmetro opcional) o resultado é exatamente o mesmo de antes.
 export function resolveProductCost(
   recipeItems: RecipeItem[],
   insumosById: Map<string, Insumo>,
   ingredientesById: Map<string, Ingrediente>,
-  yieldQuantity = 1
+  yieldQuantity = 1,
+  extraCost?: ProductExtraCost
 ): number {
   if (yieldQuantity <= 0) return 0;
-  return Math.round(resolveRecipeCost(recipeItems, insumosById, ingredientesById) / yieldQuantity);
+  const recipeTotal = resolveRecipeCost(recipeItems, insumosById, ingredientesById);
+  return Math.round((recipeTotal + resolveExtraCostTotal(yieldQuantity, extraCost)) / yieldQuantity);
 }
 
 export function toInsumosMap(insumos: Insumo[]): Map<string, Insumo> {
@@ -87,14 +115,18 @@ export function resolveProductCostPerGram(
   insumosById: Map<string, Insumo>,
   ingredientesById: Map<string, Ingrediente>,
   yieldQuantity = 1,
-  yieldWeightGrams = 0
+  yieldWeightGrams = 0,
+  extraCost?: ProductExtraCost
 ): number {
   if (yieldQuantity <= 0 || yieldWeightGrams <= 0) return 0;
 
   const totalWeightGrams = yieldQuantity * yieldWeightGrams;
   if (totalWeightGrams <= 0) return 0;
 
-  return resolveRecipeCost(recipeItems, insumosById, ingredientesById) / totalWeightGrams;
+  const totalCost =
+    resolveRecipeCost(recipeItems, insumosById, ingredientesById) +
+    resolveExtraCostTotal(yieldQuantity, extraCost);
+  return totalCost / totalWeightGrams;
 }
 
 // Peso total produzido pela receita do produto.
