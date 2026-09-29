@@ -51,7 +51,10 @@ export function AppShell({ title, children }: AppShellProps) {
           fallbackName={user.displayName}
           fallbackEmail={user.email}
         />
-        <main className="animate-page-in flex-1 px-4 pb-24 pt-4 md:px-8 md:pb-8 md:pt-8">
+        <main
+          className="animate-page-in min-w-0 flex-1 px-4 pt-4 md:px-8 md:pb-8 md:pt-8"
+          style={{ paddingBottom: "calc(6rem + env(safe-area-inset-bottom, 0px))" }}
+        >
           <h1 className="mb-6 hidden font-display text-2xl font-semibold text-ink md:block">
             {title}
           </h1>
