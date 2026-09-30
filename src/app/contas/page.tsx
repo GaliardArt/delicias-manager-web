@@ -915,6 +915,8 @@ export default function ContasPage() {
           setSelectedExpense(null);
         }}
         title={selectedExpense ? "Editar conta" : "Nova conta"}
+        maxWidthClassName="max-w-lg"
+        fixedContent
       >
         <ExpenseForm
           expense={selectedExpense}

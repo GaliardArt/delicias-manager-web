@@ -121,11 +121,11 @@ export default function InsumoDetailPage() {
         </Card>
       )}
 
-      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Editar insumo">
+      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Editar insumo" maxWidthClassName="max-w-lg" fixedContent>
         {insumo && <InsumoForm insumo={insumo} onSuccess={() => { setEditOpen(false); load(); }} />}
       </Modal>
 
-      <Modal open={purchaseOpen} onClose={() => setPurchaseOpen(false)} title="Registrar compra">
+      <Modal open={purchaseOpen} onClose={() => setPurchaseOpen(false)} title="Registrar compra" maxWidthClassName="max-w-sm" fixedContent>
         {insumo && (
           <RegisterPurchaseForm
             insumo={insumo}

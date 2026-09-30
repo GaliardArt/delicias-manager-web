@@ -114,7 +114,7 @@ export default function ClientesPage() {
         </Card>
       )}
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Novo cliente">
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Novo cliente" maxWidthClassName="max-w-sm" fixedContent>
         <CustomerForm
           onSuccess={() => {
             setModalOpen(false);

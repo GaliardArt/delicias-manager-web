@@ -155,7 +155,7 @@ export default function IngredienteDetailPage() {
         </div>
       )}
 
-      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Editar ingrediente">
+      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Editar ingrediente" maxWidthClassName="max-w-lg" fixedContent>
         {ingrediente && (
           <IngredienteForm
             ingrediente={ingrediente}

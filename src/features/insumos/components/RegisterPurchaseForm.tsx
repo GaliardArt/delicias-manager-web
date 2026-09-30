@@ -42,12 +42,12 @@ export function RegisterPurchaseForm({ insumo, onSuccess }: RegisterPurchaseForm
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-      <p className="text-sm text-ink-muted">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2 sm:gap-3 max-sm:[&_input]:h-10 max-sm:[&_input]:px-3 max-sm:[&_label]:text-xs">
+      <p className="text-xs text-ink-muted sm:text-sm">
         Estoque atual: <span className="font-semibold text-ink">{insumo.stockQuantity} {insumo.unit}</span>.
         Isso vai somar ao estoque e atualizar o custo por unidade.
       </p>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
         <MoneyInput label="Preço pago agora" valueCents={priceCents} onValueCentsChange={setPriceCents} />
         <Input
           label={`Quantidade (${insumo.unit})`}
@@ -58,7 +58,7 @@ export function RegisterPurchaseForm({ insumo, onSuccess }: RegisterPurchaseForm
           onChange={(e) => setQuantity(Number(e.target.value))}
         />
       </div>
-      <div className="rounded-xl bg-babypink px-3.5 py-3 text-sm">
+      <div className="rounded-xl bg-babypink px-3 py-2 text-xs sm:px-3.5 sm:py-3 sm:text-sm">
         <span className="text-brand-700">Novo custo por {insumo.unit}: </span>
         <span className="font-semibold text-brand-800">{formatCurrencyBRL(unitCostPreview)}</span>
       </div>
@@ -67,7 +67,7 @@ export function RegisterPurchaseForm({ insumo, onSuccess }: RegisterPurchaseForm
           <AlertCircle className="h-4 w-4 shrink-0" /> {error}
         </p>
       )}
-      <Button type="submit" loading={submitting} className="w-full">
+      <Button type="submit" loading={submitting} className="h-10 w-full sm:h-11">
         Registrar compra
       </Button>
     </form>

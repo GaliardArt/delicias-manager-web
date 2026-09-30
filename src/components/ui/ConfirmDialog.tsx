@@ -36,7 +36,7 @@ export function ConfirmDialog({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={title} maxWidthClassName="max-w-sm">
+    <Modal open={open} onClose={onClose} title={title} maxWidthClassName="max-w-sm" fixedContent>
       {description && <p className="mb-4 text-sm text-ink-muted">{description}</p>}
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={onClose}>

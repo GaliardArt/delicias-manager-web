@@ -46,9 +46,9 @@ export function StockAdjustDialog({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Ajustar estoque" maxWidthClassName="max-w-sm">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <p className="text-sm text-ink-muted">
+    <Modal open={open} onClose={onClose} title="Ajustar estoque" maxWidthClassName="max-w-sm" fixedContent>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-2 sm:gap-3 max-sm:[&_input]:h-10 max-sm:[&_input]:px-3 max-sm:[&_label]:text-xs">
+        <p className="text-xs text-ink-muted sm:text-sm">
           Estoque atual: <span className="font-semibold text-ink">{currentStock} {unit}</span>
         </p>
         <Input
@@ -57,14 +57,13 @@ export function StockAdjustDialog({
           step="any"
           value={delta}
           onChange={(e) => setDelta(Number(e.target.value))}
-          autoFocus
         />
         {error && (
           <p className="flex items-center gap-2 rounded-xl bg-danger-50 px-3.5 py-2.5 text-sm text-danger-700">
             <AlertCircle className="h-4 w-4 shrink-0" /> {error}
           </p>
         )}
-        <Button type="submit" loading={submitting} className="w-full">
+        <Button type="submit" loading={submitting} className="h-10 w-full sm:h-11">
           Confirmar ajuste
         </Button>
       </form>

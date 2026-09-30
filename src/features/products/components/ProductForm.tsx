@@ -110,21 +110,24 @@ export function ProductForm({ product, insumos, ingredientes, onSuccess }: Produ
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-      <Input
-        label="Nome"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="Brigadeiro gourmet"
-        autoFocus
-      />
-      <Input
-        label="Categoria"
-        value={category}
-        onChange={(e) => setCategory(e.target.value)}
-        placeholder="Doces, Bolos, Biscoitos..."
-      />
-      <div className="grid grid-cols-2 gap-3">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2 sm:gap-3 max-sm:[&_input]:h-10 max-sm:[&_input]:px-3 max-sm:[&_select]:h-10 max-sm:[&_label]:text-xs">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
+        <Input
+          label="Nome"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Brigadeiro gourmet"
+          className="text-sm"
+        />
+        <Input
+          label="Categoria"
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          placeholder="Doces, bolos..."
+          className="text-sm"
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
         <MoneyInput label="Preço de venda" valueCents={priceCents} onValueCentsChange={setPriceCents} />
         <Select label="Unidade" value={unit} onChange={(e) => setUnit(e.target.value)}>
           {unitOptions.map((u) => (
@@ -134,7 +137,7 @@ export function ProductForm({ product, insumos, ingredientes, onSuccess }: Produ
           ))}
         </Select>
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
         <div>
           <Input
             label="Rendimento"
@@ -144,7 +147,7 @@ export function ProductForm({ product, insumos, ingredientes, onSuccess }: Produ
             value={yieldQuantity}
             onChange={(e) => setYieldQuantity(Number(e.target.value))}
           />
-          <p className="mt-1.5 text-xs text-ink-muted">
+          <p className="mt-1 hidden text-[10px] leading-tight text-ink-muted sm:block">
             Ex: essa receita rende {yieldQuantity || 0} {unit}.
           </p>
         </div>
@@ -158,7 +161,7 @@ export function ProductForm({ product, insumos, ingredientes, onSuccess }: Produ
             onChange={(e) => setYieldWeightGrams(Number(e.target.value))}
             placeholder="Ex.: 100"
           />
-          <p className="mt-1.5 text-xs text-ink-muted">
+          <p className="mt-1 hidden text-[10px] leading-tight text-ink-muted sm:block">
             Informe para calcular peso total e custo por grama.
           </p>
         </div>
@@ -168,10 +171,11 @@ export function ProductForm({ product, insumos, ingredientes, onSuccess }: Produ
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         placeholder="Detalhes do produto"
+        className="text-sm"
       />
 
       <div>
-        <p className="mb-1.5 text-sm font-medium text-ink-muted">
+        <p className="mb-1 text-xs font-medium text-ink-muted">
           Receita (opcional — deixe vazio se não quiser calcular o custo)
         </p>
         <RecipeBuilder
@@ -183,7 +187,7 @@ export function ProductForm({ product, insumos, ingredientes, onSuccess }: Produ
       </div>
 
       {recipeItems.length > 0 && (
-        <div className="grid grid-cols-2 gap-3 rounded-xl bg-babypink px-3.5 py-3 text-sm sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 rounded-xl bg-babypink px-3 py-2 text-xs sm:grid-cols-4 sm:gap-3 sm:px-3.5 sm:py-3 sm:text-sm">
           <div>
             <span className="block text-brand-700">Custo / unidade</span>
             <span className="font-semibold text-brand-800">{formatCurrencyBRL(previewCost)}</span>
@@ -216,7 +220,7 @@ export function ProductForm({ product, insumos, ingredientes, onSuccess }: Produ
           <AlertCircle className="h-4 w-4 shrink-0" /> {error}
         </p>
       )}
-      <Button type="submit" loading={submitting} className="mt-1 w-full">
+      <Button type="submit" loading={submitting} className="h-10 w-full sm:h-11">
         {product ? "Salvar alterações" : "Cadastrar produto"}
       </Button>
     </form>

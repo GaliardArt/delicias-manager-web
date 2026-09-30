@@ -151,7 +151,7 @@ export default function CustomerDetailPage() {
         </div>
       )}
 
-      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Editar cliente">
+      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Editar cliente" maxWidthClassName="max-w-sm" fixedContent>
         {customer && (
           <CustomerForm
             customer={customer}

@@ -118,7 +118,7 @@ export default function InsumosPage() {
         </Card>
       )}
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Novo insumo">
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Novo insumo" maxWidthClassName="max-w-lg" fixedContent>
         <InsumoForm
           onSuccess={() => {
             setModalOpen(false);

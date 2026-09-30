@@ -10,6 +10,7 @@ interface ModalProps {
   title: string;
   children: React.ReactNode;
   maxWidthClassName?: string;
+  fixedContent?: boolean;
 }
 
 export function Modal({
@@ -18,6 +19,7 @@ export function Modal({
   title,
   children,
   maxWidthClassName = "max-w-md",
+  fixedContent = false,
 }: ModalProps) {
   useEffect(() => {
     if (!open) return;
@@ -38,7 +40,12 @@ export function Modal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex min-h-dvh items-center justify-center overflow-hidden bg-ink/40 p-4 backdrop-blur-sm">
+    <div
+      className={cn(
+        "fixed inset-0 z-50 flex min-h-dvh items-center justify-center overflow-hidden bg-ink/40 backdrop-blur-sm",
+        fixedContent ? "p-2 sm:p-4" : "p-4"
+      )}
+    >
       <button
         aria-label="Fechar"
         className="absolute inset-0 cursor-default"
@@ -47,11 +54,19 @@ export function Modal({
 
       <div
         className={cn(
-          "relative flex h-[calc(100dvh-2rem)] max-h-[720px] w-full min-h-0 flex-col overflow-hidden rounded-2xl bg-surface shadow-soft",
+          "relative flex w-full min-h-0 flex-col overflow-hidden rounded-2xl bg-surface shadow-soft",
+          fixedContent
+            ? "h-auto max-h-[calc(100dvh-1rem)] sm:h-[calc(100dvh-2rem)] sm:max-h-[720px]"
+            : "h-[calc(100dvh-2rem)] max-h-[720px]",
           maxWidthClassName
         )}
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-line px-5 py-4">
+        <div
+          className={cn(
+            "flex shrink-0 items-center justify-between border-b border-line",
+            fixedContent ? "px-4 py-2.5 sm:py-4" : "px-5 py-4"
+          )}
+        >
           <h2 className="font-display text-base font-semibold text-ink">{title}</h2>
           <button
             onClick={onClose}
@@ -62,7 +77,13 @@ export function Modal({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
+        <div
+          className={cn(
+            fixedContent
+              ? "min-h-0 overflow-hidden px-3 py-2 sm:flex-1 sm:overflow-y-auto sm:overscroll-contain sm:px-5 sm:py-4"
+              : "min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4"
+          )}
+        >
           {children}
         </div>
       </div>

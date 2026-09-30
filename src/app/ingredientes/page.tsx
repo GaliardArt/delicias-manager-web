@@ -126,7 +126,7 @@ export default function IngredientesPage() {
         </Card>
       )}
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Novo ingrediente">
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Novo ingrediente" maxWidthClassName="max-w-lg" fixedContent>
         <IngredienteForm
           insumos={insumos}
           allIngredientes={ingredientes ?? []}

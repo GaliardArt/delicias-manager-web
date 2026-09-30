@@ -105,9 +105,9 @@ export function RecipeBuilder({ insumos, ingredientes, value, onChange }: Recipe
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2 sm:gap-3">
       {value.length > 0 && (
-        <ul className="flex flex-col divide-y divide-line rounded-xl border border-line">
+        <ul className="no-scrollbar flex max-h-20 flex-col divide-y divide-line overflow-y-auto rounded-xl border border-line sm:max-h-none sm:overflow-visible">
           {value.map((item, index) => {
             // Itens antigos (criados antes desta conversão existir) não têm
             // enteredQuantity/enteredUnit — mostra a quantidade normal nesse caso.
@@ -139,32 +139,34 @@ export function RecipeBuilder({ insumos, ingredientes, value, onChange }: Recipe
         </ul>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end">
-        <Select
-          label="Insumo ou ingrediente"
-          value={pendingKey}
-          onChange={(e) => handleSelectSource(e.target.value)}
-        >
-          <option value="">Selecione</option>
-          {insumos.length > 0 && (
-            <optgroup label="Insumos">
-              {insumos.map((i) => (
-                <option key={i.id} value={encodeKey("insumo", i.id)}>
-                  {i.name} ({formatCurrencyBRL(i.unitCostCents)}/{i.unit})
-                </option>
-              ))}
-            </optgroup>
-          )}
-          {ingredientes.length > 0 && (
-            <optgroup label="Ingredientes">
-              {ingredientes.map((i) => (
-                <option key={i.id} value={encodeKey("ingrediente", i.id)}>
-                  {i.name} ({formatCurrencyBRL(i.unitCostCents)}/{i.yieldUnit})
-                </option>
-              ))}
-            </optgroup>
-          )}
-        </Select>
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end">
+        <div className="col-span-3 sm:col-span-1">
+          <Select
+            label="Insumo ou ingrediente"
+            value={pendingKey}
+            onChange={(e) => handleSelectSource(e.target.value)}
+          >
+            <option value="">Selecione</option>
+            {insumos.length > 0 && (
+              <optgroup label="Insumos">
+                {insumos.map((i) => (
+                  <option key={i.id} value={encodeKey("insumo", i.id)}>
+                    {i.name} ({formatCurrencyBRL(i.unitCostCents)}/{i.unit})
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {ingredientes.length > 0 && (
+              <optgroup label="Ingredientes">
+                {ingredientes.map((i) => (
+                  <option key={i.id} value={encodeKey("ingrediente", i.id)}>
+                    {i.name} ({formatCurrencyBRL(i.unitCostCents)}/{i.yieldUnit})
+                  </option>
+                ))}
+              </optgroup>
+            )}
+          </Select>
+        </div>
         <Input
           label="Quantidade"
           type="number"
@@ -172,14 +174,14 @@ export function RecipeBuilder({ insumos, ingredientes, value, onChange }: Recipe
           step="any"
           value={pendingQuantity}
           onChange={(e) => setPendingQuantity(Number(e.target.value))}
-          className="w-full sm:w-28"
+          className="h-10 w-full px-3 text-sm sm:h-11 sm:w-28 sm:px-3.5"
         />
         <Select
           label="Unidade"
           value={pendingUnit}
           onChange={(e) => setPendingUnit(e.target.value)}
           disabled={!pendingSource}
-          className="w-full sm:w-32"
+          className="h-10 w-full px-3 text-sm sm:h-11 sm:w-32 sm:px-3.5"
         >
           {unitOptions.map((u) => (
             <option key={u.value} value={u.value}>
@@ -187,8 +189,15 @@ export function RecipeBuilder({ insumos, ingredientes, value, onChange }: Recipe
             </option>
           ))}
         </Select>
-        <Button type="button" variant="secondary" onClick={handleAdd} disabled={!pendingKey}>
-          <Plus className="h-4 w-4" /> Adicionar
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={handleAdd}
+          disabled={!pendingKey}
+          aria-label="Adicionar item à receita"
+          className="h-10 w-10 self-end px-0 sm:h-11 sm:w-auto sm:px-3"
+        >
+          <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Adicionar</span>
         </Button>
       </div>
       {conversionError && <p className="text-xs text-danger-500">{conversionError}</p>}

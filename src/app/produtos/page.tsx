@@ -133,7 +133,7 @@ export default function ProdutosPage() {
         </Card>
       )}
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Novo produto">
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Novo produto" maxWidthClassName="max-w-xl" fixedContent>
         <ProductForm
           insumos={insumos}
           ingredientes={ingredientes}

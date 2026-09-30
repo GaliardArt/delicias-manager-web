@@ -177,9 +177,9 @@ function HorizontalBars({
       {values.map((item) => {
         const width = max > 0 ? Math.max(3, (Math.abs(item.value) / max) * 100) : 0;
         return (
-          <div key={item.label} className="grid grid-cols-[110px_1fr_auto] items-center gap-2 text-xs sm:grid-cols-[140px_1fr_auto]">
-            <span className="truncate text-ink-muted">{item.label}</span>
-            <div className="h-2.5 overflow-hidden rounded-full bg-surface-muted">
+          <div key={item.label} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 text-xs sm:grid-cols-[140px_minmax(0,1fr)_auto]">
+            <span className="col-span-2 truncate text-ink-muted sm:col-span-1">{item.label}</span>
+            <div className="h-2.5 min-w-0 overflow-hidden rounded-full bg-surface-muted sm:col-auto">
               <div className="h-full rounded-full bg-brand-400" style={{ width: width + "%" }} />
             </div>
             <span className="whitespace-nowrap font-medium text-ink">{item.display ?? numberBR(item.value)}</span>
@@ -203,27 +203,34 @@ function VerticalBars({
   if (values.length === 0) return <p className="text-sm text-ink-muted">Sem dados para o período.</p>;
   const max = Math.max(...values.map((item) => Math.max(0, item.value)), 0);
 
+  const labelStep = Math.max(1, Math.ceil(values.length / 5));
+
   return (
-    <div className="overflow-x-auto">
-      <div className="flex min-w-max items-end gap-1 border-b border-line px-1 pt-2" style={{ height: 220 }}>
-        {values.map((item) => {
+    <div className="w-full min-w-0">
+      <div className="flex w-full min-w-0 items-end gap-1 border-b border-line px-1 pt-2" style={{ height: 220 }}>
+        {values.map((item, index) => {
           const height = max > 0 ? Math.max(5, (Math.max(0, item.value) / max) * 175) : 5;
           return (
-            <div key={item.label} className="flex w-8 flex-col items-center justify-end gap-1">
-              <div className="text-[9px] text-ink-faint">
+            <div key={item.label} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1">
+              <div className="hidden max-w-full truncate text-[9px] text-ink-faint sm:block">
                 {formatValue ? formatValue(item.value) : numberBR(item.value)}
               </div>
               <div
-                className="w-full rounded-t-md bg-brand-400"
+                className="w-full max-w-8 rounded-t-md bg-brand-400"
                 style={{ height }}
                 title={item.label + ": " + (formatValue ? formatValue(item.value) : numberBR(item.value))}
               />
-              <div className="w-10 -rotate-45 origin-top-right truncate pt-1 text-[9px] text-ink-faint">
+              <div className="hidden w-10 -rotate-45 origin-top-right truncate pt-1 text-[9px] text-ink-faint sm:block">
                 {item.label}
               </div>
             </div>
           );
         })}
+      </div>
+      <div className="mt-2 grid grid-cols-5 gap-1 text-center text-[10px] text-ink-faint sm:hidden">
+        {values.filter((_, index) => index % labelStep === 0 || index === values.length - 1).slice(0, 5).map((item) => (
+          <span key={item.label} className="truncate">{item.label}</span>
+        ))}
       </div>
     </div>
   );
@@ -243,7 +250,21 @@ function DataTable({
   }
 
   return (
-    <div className="overflow-x-auto">
+    <>
+    <div className="space-y-2 md:hidden">
+      {rows.map((row, rowIndex) => (
+        <dl key={rowIndex} className="rounded-xl border border-line bg-surface p-3">
+          {row.map((cell, cellIndex) => (
+            <div key={cellIndex} className="flex min-w-0 items-start justify-between gap-3 py-1.5 first:pt-0 last:pb-0">
+              <dt className="shrink-0 text-xs text-ink-muted">{headers[cellIndex]}</dt>
+              <dd className="min-w-0 break-words text-right text-sm text-ink">{cell}</dd>
+            </div>
+          ))}
+        </dl>
+      ))}
+    </div>
+
+    <div className="hidden overflow-x-auto md:block">
       <table className="w-full min-w-[680px] text-left text-sm">
         <thead>
           <tr className="border-b border-line text-xs text-ink-muted">
@@ -267,6 +288,7 @@ function DataTable({
         </tbody>
       </table>
     </div>
+    </>
   );
 }
 
@@ -748,7 +770,7 @@ export default function RelatoriosPage() {
 
   return (
     <AppShell title="Relatórios">
-      <div className="flex flex-col gap-4">
+      <div className="flex min-w-0 max-w-full flex-col gap-4 overflow-x-clip">
         <div className="no-print flex flex-col gap-3 rounded-2xl border border-line bg-surface p-3 shadow-card sm:flex-row sm:items-end sm:justify-between">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <Select
@@ -808,14 +830,14 @@ export default function RelatoriosPage() {
           </div>
         </div>
 
-        <div className="no-print flex gap-1 overflow-x-auto rounded-2xl border border-line bg-surface p-1 shadow-card">
+        <div className="no-print grid grid-cols-2 gap-1 rounded-2xl border border-line bg-surface p-1 shadow-card sm:flex sm:flex-wrap">
           {tabs.map((item) => (
             <button
               key={item.id}
               type="button"
               onClick={() => setTab(item.id)}
               className={
-                "whitespace-nowrap rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors " +
+                "min-w-0 rounded-xl px-2 py-2.5 text-center text-xs font-medium transition-colors sm:px-3.5 sm:text-sm " +
                 (tab === item.id ? "bg-brand-500 text-white" : "text-ink-muted hover:bg-surface-muted hover:text-ink")
               }
             >
@@ -824,15 +846,15 @@ export default function RelatoriosPage() {
           ))}
         </div>
 
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
             <h2 className="font-display text-lg font-semibold text-ink">{tabs.find((item) => item.id === tab)?.label}</h2>
             <p className="text-xs text-ink-muted">
               {period.label} · {period.start.toLocaleDateString("pt-BR")} a{" "}
               {new Date(period.end.getTime() - 86400000).toLocaleDateString("pt-BR")}
             </p>
           </div>
-          <div className="no-print rounded-full bg-surface-muted px-3 py-1 text-xs text-ink-muted">
+          <div className="no-print w-fit rounded-full bg-surface-muted px-3 py-1 text-xs text-ink-muted">
             Relatório analítico
           </div>
         </div>
@@ -1370,12 +1392,12 @@ export default function RelatoriosPage() {
 
         {tab === "abc" && (
           <div className="flex flex-col gap-4">
-            <div className="no-print flex items-center justify-between rounded-2xl border border-line bg-surface p-3 shadow-card">
+          <div className="no-print flex flex-col gap-3 rounded-2xl border border-line bg-surface p-3 shadow-card sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-medium text-ink">Critério da Curva ABC</p>
                 <p className="text-xs text-ink-muted">O acumulado usa dados apenas dos produtos com valor no critério selecionado.</p>
               </div>
-              <Select value={abcMode} onChange={(event) => setAbcMode(event.target.value as typeof abcMode)} className="w-48">
+              <Select value={abcMode} onChange={(event) => setAbcMode(event.target.value as typeof abcMode)} className="w-full sm:w-48">
                 <option value="faturamento">Faturamento</option>
                 <option value="lucro">Lucro</option>
                 <option value="quantidade">Quantidade</option>

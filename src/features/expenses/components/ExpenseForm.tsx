@@ -130,16 +130,16 @@ export function ExpenseForm({ onSuccess, expense }: ExpenseFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2 sm:gap-3 max-sm:[&_input]:h-10 max-sm:[&_input]:px-3 max-sm:[&_select]:h-10 max-sm:[&_label]:text-xs">
       <Input
         label="Descrição"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         placeholder="Gasolina, compra de embalagens..."
-        autoFocus
+        className="text-sm"
       />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
         <Select
           label="Categoria"
           value={category}
@@ -161,7 +161,7 @@ export function ExpenseForm({ onSuccess, expense }: ExpenseFormProps) {
         </Select>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
         <MoneyInput
           label="Valor"
           valueCents={amountCents}
@@ -175,7 +175,7 @@ export function ExpenseForm({ onSuccess, expense }: ExpenseFormProps) {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
         <Select
           label="Status"
           value={status}
@@ -192,25 +192,27 @@ export function ExpenseForm({ onSuccess, expense }: ExpenseFormProps) {
         />
       </div>
 
-      {status === "pago" && (
-        <Input
-          label="Data do pagamento"
-          type="date"
-          value={paidAt}
-          onChange={(e) => setPaidAt(e.target.value)}
-        />
-      )}
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
+        {status === "pago" && (
+          <Input
+            label="Data do pagamento"
+            type="date"
+            value={paidAt}
+            onChange={(e) => setPaidAt(e.target.value)}
+          />
+        )}
 
-      <Select
-        label="Recorrência"
-        value={recurrence}
-        onChange={(e) => setRecurrence(e.target.value as ExpenseRecurrence)}
-      >
-        <option value="nenhuma">Não se repete</option>
-        <option value="semanal">Semanal</option>
-        <option value="mensal">Mensal</option>
-        <option value="anual">Anual</option>
-      </Select>
+        <Select
+          label="Recorrência"
+          value={recurrence}
+          onChange={(e) => setRecurrence(e.target.value as ExpenseRecurrence)}
+        >
+          <option value="nenhuma">Não se repete</option>
+          <option value="semanal">Semanal</option>
+          <option value="mensal">Mensal</option>
+          <option value="anual">Anual</option>
+        </Select>
+      </div>
 
       <div>
         <label
@@ -224,7 +226,7 @@ export function ExpenseForm({ onSuccess, expense }: ExpenseFormProps) {
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Ex.: pago no cartão, referente à compra do estoque..."
-          rows={3}
+          rows={2}
           className="w-full resize-none rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-faint focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
         />
       </div>
@@ -235,7 +237,7 @@ export function ExpenseForm({ onSuccess, expense }: ExpenseFormProps) {
         </p>
       )}
 
-      <Button type="submit" loading={submitting} className="mt-1 w-full">
+      <Button type="submit" loading={submitting} className="h-10 w-full sm:h-11">
         {expense ? "Salvar alterações" : "Registrar conta"}
       </Button>
     </form>

@@ -245,7 +245,7 @@ export default function ProductDetailPage() {
         </div>
       )}
 
-      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Editar produto">
+      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Editar produto" maxWidthClassName="max-w-xl" fixedContent>
         {product && (
           <ProductForm
             product={product}

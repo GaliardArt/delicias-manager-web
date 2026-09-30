@@ -87,15 +87,15 @@ export function InsumoForm({ insumo, onSuccess }: InsumoFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2 sm:gap-3 max-sm:[&_input]:h-10 max-sm:[&_input]:px-3 max-sm:[&_select]:h-10 max-sm:[&_label]:text-xs">
       <Input
         label="Nome"
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="Leite condensado"
-        autoFocus
+        className="text-sm"
       />
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
         <MoneyInput
           label="Preço pago"
           valueCents={purchasePriceCents}
@@ -122,7 +122,7 @@ export function InsumoForm({ insumo, onSuccess }: InsumoFormProps) {
       </p>
 
       {showPackageConversion && (
-        <div className="rounded-xl border border-line p-3.5">
+        <div className="rounded-xl border border-line p-2">
           <label className="flex items-center gap-2 text-sm font-medium text-ink">
             <input
               type="checkbox"
@@ -132,13 +132,13 @@ export function InsumoForm({ insumo, onSuccess }: InsumoFormProps) {
             />
             Permitir lançar em outra unidade nas receitas
           </label>
-          <p className="mt-1 text-xs text-ink-muted">
+          <p className="mt-1 text-[10px] leading-tight text-ink-muted">
             "{unit}" não converte sozinho pra outra unidade (ao contrário de g/kg ou ml/l). Se
             quiser lançar a quantidade em receitas usando, por exemplo, "unidade" em vez de "
             {unit}", informe quanto equivale a 1 {unit}.
           </p>
           {usePackageConversion && (
-            <div className="mt-3 grid grid-cols-[1fr_auto] items-end gap-3">
+            <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
               <Input
                 label={`1 ${unit} equivale a`}
                 type="number"
@@ -159,7 +159,7 @@ export function InsumoForm({ insumo, onSuccess }: InsumoFormProps) {
         </div>
       )}
 
-      <div className="rounded-xl bg-babypink px-3.5 py-3 text-sm">
+      <div className="rounded-xl bg-babypink px-3 py-2 text-xs sm:px-3.5 sm:py-3 sm:text-sm">
         <span className="text-brand-700">Custo por {unit}: </span>
         <span className="font-semibold text-brand-800">{formatCurrencyBRL(unitCostPreview)}</span>
       </div>
@@ -169,7 +169,7 @@ export function InsumoForm({ insumo, onSuccess }: InsumoFormProps) {
           <AlertCircle className="h-4 w-4 shrink-0" /> {error}
         </p>
       )}
-      <Button type="submit" loading={submitting} className="mt-1 w-full">
+      <Button type="submit" loading={submitting} className="h-10 w-full sm:h-11">
         {insumo ? "Salvar alterações" : "Cadastrar insumo"}
       </Button>
     </form>
