@@ -382,7 +382,7 @@ export default function ContasPage() {
         amountCents: expense.amountCents,
         date: expense.date,
         dueDate: expense.dueDate,
-        paidAt: todayLocalIso(),
+        paidAt: expense.dueDate ?? expense.date,
         kind: expense.kind ?? "variavel",
         status: "pago",
         recurrence: expense.recurrence ?? "nenhuma",

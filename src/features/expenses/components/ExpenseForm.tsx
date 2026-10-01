@@ -23,9 +23,7 @@ export function ExpenseForm({ onSuccess, expense }: ExpenseFormProps) {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Outros");
   const [amountCents, setAmountCents] = useState(0);
-  const [date, setDate] = useState(todayLocalIso());
   const [dueDate, setDueDate] = useState(todayLocalIso());
-  const [paidAt, setPaidAt] = useState(todayLocalIso());
   const [kind, setKind] = useState<ExpenseKind>("variavel");
   const [status, setStatus] = useState<ExpenseStatus>("pago");
   const [recurrence, setRecurrence] = useState<ExpenseRecurrence>("nenhuma");
@@ -38,9 +36,7 @@ export function ExpenseForm({ onSuccess, expense }: ExpenseFormProps) {
       setDescription("");
       setCategory("Outros");
       setAmountCents(0);
-      setDate(todayLocalIso());
       setDueDate(todayLocalIso());
-      setPaidAt(todayLocalIso());
       setKind("variavel");
       setStatus("pago");
       setRecurrence("nenhuma");
@@ -53,9 +49,7 @@ export function ExpenseForm({ onSuccess, expense }: ExpenseFormProps) {
     setDescription(expense.description);
     setCategory(expense.category || "Outros");
     setAmountCents(expense.amountCents);
-    setDate(fallbackDate);
     setDueDate(expense.dueDate || fallbackDate);
-    setPaidAt(expense.paidAt || fallbackDate);
     setKind(expense.kind ?? "variavel");
     setStatus(expense.status ?? "pago");
     setRecurrence(expense.recurrence ?? "nenhuma");
@@ -65,9 +59,6 @@ export function ExpenseForm({ onSuccess, expense }: ExpenseFormProps) {
 
   function handleStatusChange(nextStatus: ExpenseStatus) {
     setStatus(nextStatus);
-    if (nextStatus === "pago" && !paidAt) {
-      setPaidAt(todayLocalIso());
-    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -82,16 +73,8 @@ export function ExpenseForm({ onSuccess, expense }: ExpenseFormProps) {
       setError("Informe um valor maior que zero.");
       return;
     }
-    if (!date) {
-      setError("Informe a data da despesa.");
-      return;
-    }
-    if (dueDate && dueDate < date) {
-      setError("O vencimento não pode ser anterior à data da despesa.");
-      return;
-    }
-    if (status === "pago" && !paidAt) {
-      setError("Informe a data do pagamento.");
+    if (!dueDate) {
+      setError("Informe a data de vencimento.");
       return;
     }
 
@@ -101,12 +84,12 @@ export function ExpenseForm({ onSuccess, expense }: ExpenseFormProps) {
         description: description.trim(),
         category,
         amountCents,
-        date,
-        dueDate: dueDate || date,
-        paidAt: status === "pago" ? paidAt || date : undefined,
+        date: expense?.date || todayLocalIso(),
+        dueDate,
+        paidAt: status === "pago" ? dueDate : undefined,
         kind,
         status,
-        recurrence,
+        recurrence: kind === "fixa" ? recurrence : "nenhuma",
         notes,
       };
 
@@ -161,19 +144,11 @@ export function ExpenseForm({ onSuccess, expense }: ExpenseFormProps) {
         </Select>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:gap-3">
-        <MoneyInput
-          label="Valor"
-          valueCents={amountCents}
-          onValueCentsChange={setAmountCents}
-        />
-        <Input
-          label="Data da despesa"
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-        />
-      </div>
+      <MoneyInput
+        label="Valor"
+        valueCents={amountCents}
+        onValueCentsChange={setAmountCents}
+      />
 
       <div className="grid grid-cols-2 gap-2 sm:gap-3">
         <Select
@@ -192,16 +167,7 @@ export function ExpenseForm({ onSuccess, expense }: ExpenseFormProps) {
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:gap-3">
-        {status === "pago" && (
-          <Input
-            label="Data do pagamento"
-            type="date"
-            value={paidAt}
-            onChange={(e) => setPaidAt(e.target.value)}
-          />
-        )}
-
+      {kind === "fixa" && (
         <Select
           label="Recorrência"
           value={recurrence}
@@ -212,7 +178,7 @@ export function ExpenseForm({ onSuccess, expense }: ExpenseFormProps) {
           <option value="mensal">Mensal</option>
           <option value="anual">Anual</option>
         </Select>
-      </div>
+      )}
 
       <div>
         <label
