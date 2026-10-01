@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
@@ -21,8 +22,12 @@ export function Modal({
   maxWidthClassName = "max-w-md",
   fixedContent = false,
 }: ModalProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
   useEffect(() => {
-    if (!open) return;
+    if (!open || !mounted) return;
 
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -35,11 +40,11 @@ export function Modal({
       document.removeEventListener("keydown", handleKey);
       document.body.style.overflow = "";
     };
-  }, [open, onClose]);
+  }, [open, onClose, mounted]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
+  return createPortal(
     <div
       className={cn(
         "fixed inset-0 z-50 flex min-h-dvh items-center justify-center overflow-hidden bg-ink/40 backdrop-blur-sm",
@@ -80,13 +85,14 @@ export function Modal({
         <div
           className={cn(
             fixedContent
-              ? "min-h-0 overflow-hidden px-3 py-2 sm:flex-1 sm:overflow-y-auto sm:overscroll-contain sm:px-5 sm:py-4"
+              ? "min-h-0 overflow-y-auto overscroll-contain px-3 py-2 sm:flex-1 sm:px-5 sm:py-4"
               : "min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4"
           )}
         >
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
