@@ -10,7 +10,11 @@ export function formatCurrencyBRL(cents: number): string {
 }
 
 export function formatDateBR(isoDate: string): string {
-  const date = new Date(isoDate);
+  // Datas sem horário (ex.: YYYY-MM-DD) representam um dia do calendário,
+  // não um instante UTC. Interpretá-las em UTC faz Brasília exibir o dia anterior.
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(isoDate)
+    ? new Date(`${isoDate}T00:00:00`)
+    : new Date(isoDate);
   return date.toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
