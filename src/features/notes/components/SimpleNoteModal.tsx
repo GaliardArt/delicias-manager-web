@@ -1,7 +1,8 @@
 "use client";
 
 import { FileDown, Share2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { formatCurrencyBRL } from "@/lib/utils/format";
@@ -20,6 +21,9 @@ interface SimpleNoteModalProps {
 
 export function SimpleNoteModal({ open, onClose, data }: SimpleNoteModalProps) {
   const [generating, setGenerating] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   async function handleGeneratePdf() {
     setGenerating(true);
@@ -56,7 +60,9 @@ export function SimpleNoteModal({ open, onClose, data }: SimpleNoteModalProps) {
     }
   }
 
-  return (
+  if (!open || !mounted) return null;
+
+  return createPortal(
     <Modal open={open} onClose={onClose} title="Nota simples" maxWidthClassName="max-w-lg">
       <div className="flex flex-col gap-4">
         <div className="rounded-xl border border-line bg-white p-5 shadow-card">
@@ -118,6 +124,7 @@ export function SimpleNoteModal({ open, onClose, data }: SimpleNoteModalProps) {
           </Button>
         </div>
       </div>
-    </Modal>
+    </Modal>,
+    document.body
   );
 }
