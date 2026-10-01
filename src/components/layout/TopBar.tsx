@@ -25,7 +25,8 @@ export function TopBar({
     "Usuário";
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-surface/95 px-4 py-3.5 backdrop-blur md:hidden">
+    <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-line bg-surface/95 px-4 pb-3.5 backdrop-blur md:hidden"
+      style={{ paddingTop: "max(0.875rem, env(safe-area-inset-top, 0px))" }}>
       <div className="flex min-w-0 items-center gap-2">
         <span className="text-lg">🍰</span>
         <div className="min-w-0">

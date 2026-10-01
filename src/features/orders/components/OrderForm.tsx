@@ -15,7 +15,7 @@ import { listActiveProducts } from "@/lib/firebase/products";
 import { listActiveInsumos } from "@/lib/firebase/insumos";
 import { listActiveIngredientes } from "@/lib/firebase/ingredientes";
 import { createOrder } from "@/lib/firebase/orders";
-import { resolveProductCost, toInsumosMap, toIngredientesMap } from "@/lib/costing";
+import { getProductExtraCost, resolveProductCost, toInsumosMap, toIngredientesMap } from "@/lib/costing";
 import { formatCurrencyBRL, localIsoPlusDays } from "@/lib/utils/format";
 import { paymentMethodOptions } from "@/lib/utils/payment-method";
 
@@ -88,7 +88,8 @@ export function OrderForm() {
       product.recipeItems,
       toInsumosMap(insumos),
       toIngredientesMap(ingredientes),
-      product.yieldQuantity
+      product.yieldQuantity,
+      getProductExtraCost(product)
     );
 
     setItems((prev) => [
@@ -268,11 +269,12 @@ export function OrderForm() {
           </ul>
         )}
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto_auto_auto] lg:items-end">
           <Select
             label="Produto"
             value={pendingProductId}
             onChange={(e) => handleSelectProduct(e.target.value)}
+            wrapperClassName="lg:min-w-0"
           >
             <option value="">Selecione um produto</option>
             {products.map((p) => (
@@ -287,13 +289,13 @@ export function OrderForm() {
             min={1}
             value={pendingQuantity}
             onChange={(e) => setPendingQuantity(Number(e.target.value))}
-            className="w-full sm:w-20"
+            className="w-full lg:w-24"
           />
           <MoneyInput
             label="Preço un."
             valueCents={pendingPriceCents}
             onValueCentsChange={setPendingPriceCents}
-            className="w-full sm:w-28"
+            className="w-full lg:w-32"
           />
           <Button
             type="button"
@@ -310,7 +312,7 @@ export function OrderForm() {
         <CardHeader>
           <CardTitle>Sinal / pagamento (opcional)</CardTitle>
         </CardHeader>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2">
           <Select
             label="Forma de pagamento"
             value={method}
@@ -357,7 +359,7 @@ export function OrderForm() {
         </p>
       )}
 
-      <div className="fixed inset-x-0 bottom-16 z-30 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur md:static md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+      <div className="fixed inset-x-0 bottom-above-nav z-30 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur md:static md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
         <Button
           size="lg"
           className="w-full"

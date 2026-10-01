@@ -32,6 +32,11 @@ export interface RecipeItem {
   enteredUnit?: string; // unidade escolhida pelo usuário ao montar a receita (ex: "g" para um insumo cuja base é "kg")
 }
 
+// Como o custo adicional de um produto é cobrado:
+// - "unidade": valor fixo somado ao custo de CADA unidade produzida (ex: embalagem);
+// - "receita": valor gasto uma vez por receita inteira, diluído pelo rendimento (ex: gás, mão de obra).
+export type ExtraCostMode = "unidade" | "receita";
+
 export interface Product {
   id: string;
   name: string;
@@ -45,6 +50,11 @@ export interface Product {
   createdAt: string;
   recipeItems: RecipeItem[]; // receita (insumos e/ou ingredientes) — custo é calculado, nunca digitado
   stockQuantity: number; // estoque de produto pronto; pode ficar negativo
+  // Campos fixos antigos são mantidos para compatibilidade com registros existentes.
+  extraCostCents: number;
+  extraCostMode: ExtraCostMode;
+  // Percentual adicionado sobre o custo base da receita.
+  extraCostPct: number;
 }
 
 // Insumo = matéria-prima comprada (farinha, leite condensado, cacau...).

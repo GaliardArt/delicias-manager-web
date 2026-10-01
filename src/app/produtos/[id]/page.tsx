@@ -18,6 +18,7 @@ import { listAllInsumos } from "@/lib/firebase/insumos";
 import { listAllIngredientes } from "@/lib/firebase/ingredientes";
 import { getProductStats, ProductStats } from "@/lib/firebase/stats";
 import {
+  getProductExtraCost,
   resolveProductCost,
   resolveProductCostPerGram,
   resolveProductTotalWeightGrams,
@@ -70,11 +71,16 @@ export default function ProductDetailPage() {
             product.recipeItems,
             toInsumosMap(insumos),
             toIngredientesMap(ingredientes),
-            product.yieldQuantity
+            product.yieldQuantity,
+            getProductExtraCost(product)
           )
         : 0,
     [product, insumos, ingredientes]
   );
+  const extraCost = product ? getProductExtraCost(product) : getProductExtraCost({});
+  const hasCostInfo = product
+    ? product.recipeItems.length > 0 || extraCost.cents > 0 || extraCost.percentage > 0
+    : false;
   const margin = product ? product.priceCents - cost : 0;
   const marginPct = product && product.priceCents > 0 ? (margin / product.priceCents) * 100 : 0;
   const totalWeightGrams = product
@@ -87,7 +93,8 @@ export default function ProductDetailPage() {
           toInsumosMap(insumos),
           toIngredientesMap(ingredientes),
           product.yieldQuantity,
-          product.yieldWeightGrams
+          product.yieldWeightGrams,
+          getProductExtraCost(product)
         )
       : 0;
 
@@ -151,14 +158,12 @@ export default function ProductDetailPage() {
               <div>
                 <p className="text-ink-muted">Estoque</p>
                 <p
-                  className={`font-display text-base font-semibold ${
-                    product.stockQuantity < 0 ? "text-danger-500" : "text-ink"
-                  }`}
+                  className={`font-display text-base font-semibold ${product.stockQuantity < 0 ? "text-danger-500" : "text-ink"}`}
                 >
                   {product.stockQuantity}
                 </p>
               </div>
-              {product.recipeItems.length > 0 && (
+              {hasCostInfo && (
                 <>
                   <div>
                     <p className="text-ink-muted">Custo</p>
@@ -166,6 +171,14 @@ export default function ProductDetailPage() {
                       {formatCurrencyBRL(cost)}
                     </p>
                   </div>
+                  {extraCost.percentage > 0 && (
+                    <div>
+                      <p className="text-ink-muted">Custo adicional</p>
+                      <p className="font-display text-base font-semibold text-ink">
+                        {extraCost.percentage.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%
+                      </p>
+                    </div>
+                  )}
                   {product.yieldWeightGrams > 0 && (
                     <>
                       <div>
@@ -245,7 +258,13 @@ export default function ProductDetailPage() {
         </div>
       )}
 
-      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Editar produto" maxWidthClassName="max-w-xl" fixedContent>
+      <Modal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        title="Editar produto"
+        maxWidthClassName="max-w-2xl"
+        fixedContent
+      >
         {product && (
           <ProductForm
             product={product}

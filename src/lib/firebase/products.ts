@@ -13,7 +13,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "./config";
-import { Product, RecipeItem } from "@/types";
+import { ExtraCostMode, Product, RecipeItem } from "@/types";
 
 // Normaliza documentos antigos (de antes da receita/estoque existirem) com
 // valores padrão, em vez de deixar `undefined` vazar pro resto do app.
@@ -31,6 +31,10 @@ function mapProductDoc(id: string, data: DocumentData): Product {
     createdAt: data.createdAt,
     recipeItems: data.recipeItems ?? [],
     stockQuantity: data.stockQuantity ?? 0,
+    // Produtos cadastrados antes do custo adicional existir não têm esses campos.
+    extraCostCents: Number(data.extraCostCents ?? 0),
+    extraCostMode: data.extraCostMode === "receita" ? "receita" : "unidade",
+    extraCostPct: Math.max(0, Number(data.extraCostPct ?? 0)),
   };
 }
 
@@ -66,11 +70,23 @@ interface ProductInput {
   yieldWeightGrams: number;
   description?: string;
   recipeItems: RecipeItem[];
+  extraCostCents: number;
+  extraCostMode: ExtraCostMode;
+  extraCostPct: number;
+}
+
+function normalizeExtraCost(input: ProductInput) {
+  return {
+    extraCostCents: Math.max(0, Math.round(input.extraCostCents || 0)),
+    extraCostMode: input.extraCostMode === "receita" ? "receita" : "unidade",
+    extraCostPct: Math.max(0, Number(input.extraCostPct || 0)),
+  };
 }
 
 export async function createProduct(input: ProductInput): Promise<string> {
   const ref = await addDoc(collection(db, "products"), {
     ...input,
+    ...normalizeExtraCost(input),
     yieldWeightGrams: Math.max(0, input.yieldWeightGrams || 0),
     stockQuantity: 0,
     active: true,
@@ -82,6 +98,7 @@ export async function createProduct(input: ProductInput): Promise<string> {
 export async function updateProduct(id: string, input: ProductInput): Promise<void> {
   await updateDoc(doc(db, "products", id), {
     ...input,
+    ...normalizeExtraCost(input),
     yieldWeightGrams: Math.max(0, input.yieldWeightGrams || 0),
   });
 }

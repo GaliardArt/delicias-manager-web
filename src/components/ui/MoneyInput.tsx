@@ -7,6 +7,7 @@ interface MoneyInputProps
   extends Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type"> {
   label?: string;
   error?: string;
+  wrapperClassName?: string;
   /** Valor atual em centavos (fonte da verdade — nunca usar float para dinheiro). */
   valueCents: number;
   onValueCentsChange: (cents: number) => void;
@@ -44,7 +45,7 @@ export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(
             {label}
           </label>
         )}
-        <div className="relative">
+        <div className="relative min-w-0">
           <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-ink-faint">
             R$
           </span>
@@ -55,7 +56,7 @@ export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(
             value={display}
             onChange={handleChange}
             className={cn(
-              "h-11 w-full rounded-xl border border-line bg-surface pl-9 pr-3.5 text-right text-sm text-ink outline-none transition-colors",
+              "h-11 w-full min-w-0 rounded-xl border border-line bg-surface pl-9 pr-3.5 text-right text-base text-ink outline-none transition-colors sm:text-sm",
               "focus:border-brand-400 focus:ring-2 focus:ring-brand-100",
               error && "border-danger-500 focus:border-danger-500 focus:ring-danger-50",
               className
