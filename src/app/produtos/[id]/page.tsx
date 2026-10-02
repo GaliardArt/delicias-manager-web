@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { AlertCircle, ArrowLeft, Pencil, Power, Boxes } from "lucide-react";
+import { AlertCircle, ArrowLeft, Boxes, Copy, Pencil, Power } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -13,7 +13,12 @@ import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { StockAdjustDialog } from "@/components/ui/StockAdjustDialog";
 import { ProductForm } from "@/features/products/components/ProductForm";
-import { getProduct, setProductActive, adjustProductStock } from "@/lib/firebase/products";
+import {
+  adjustProductStock,
+  createProduct,
+  getProduct,
+  setProductActive,
+} from "@/lib/firebase/products";
 import { listAllInsumos } from "@/lib/firebase/insumos";
 import { listAllIngredientes } from "@/lib/firebase/ingredientes";
 import { getProductStats, ProductStats } from "@/lib/firebase/stats";
@@ -30,6 +35,7 @@ import { formatCurrencyBRL } from "@/lib/utils/format";
 
 export default function ProductDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const [product, setProduct] = useState<Product | null | undefined>(undefined);
   const [insumos, setInsumos] = useState<Insumo[]>([]);
   const [ingredientes, setIngredientes] = useState<Ingrediente[]>([]);
@@ -38,6 +44,8 @@ export default function ProductDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [stockOpen, setStockOpen] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
+  const [duplicateError, setDuplicateError] = useState(false);
 
   async function load() {
     setError(false);
@@ -63,6 +71,34 @@ export default function ProductDetailPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
+
+  async function handleDuplicateProduct() {
+    if (!product || duplicating) return;
+
+    setDuplicating(true);
+    setDuplicateError(false);
+    try {
+      const duplicatedId = await createProduct({
+        name: `${product.name} (cópia)`,
+        category: product.category,
+        priceCents: product.priceCents,
+        unit: product.unit,
+        yieldQuantity: product.yieldQuantity,
+        yieldWeightGrams: product.yieldWeightGrams,
+        description: product.description ?? "",
+        recipeItems: product.recipeItems.map((item) => ({ ...item })),
+        extraCostCents: product.extraCostCents ?? 0,
+        extraCostMode: product.extraCostMode ?? "unidade",
+        extraCostPct: product.extraCostPct ?? 0,
+      });
+      router.push(`/produtos/${duplicatedId}`);
+    } catch (err) {
+      console.error(err);
+      setDuplicateError(true);
+    } finally {
+      setDuplicating(false);
+    }
+  }
 
   const cost = useMemo(
     () =>
@@ -209,6 +245,14 @@ export default function ProductDetailPage() {
               <Button variant="secondary" size="sm" onClick={() => setEditOpen(true)}>
                 <Pencil className="h-4 w-4" /> Editar
               </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                loading={duplicating}
+                onClick={handleDuplicateProduct}
+              >
+                <Copy className="h-4 w-4" /> Duplicar
+              </Button>
               <Button variant="ghost" size="sm" onClick={() => setStockOpen(true)}>
                 <Boxes className="h-4 w-4" /> Ajustar estoque
               </Button>
@@ -216,6 +260,11 @@ export default function ProductDetailPage() {
                 <Power className="h-4 w-4" /> {product.active ? "Desativar" : "Reativar"}
               </Button>
             </div>
+            {duplicateError && (
+              <p className="mt-2 text-sm text-danger-700">
+                Não foi possível duplicar o produto. Tente novamente.
+              </p>
+            )}
           </Card>
 
           {product.recipeItems.length > 0 && (
