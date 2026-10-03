@@ -14,6 +14,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "./config";
+import { readThroughCache } from "./read-cache";
 import { Expense, ExpenseKind, ExpenseRecurrence, ExpenseStatus } from "@/types";
 
 export const EXPENSE_CATEGORIES = [
@@ -126,20 +127,24 @@ function mapExpenses(snapshot: QuerySnapshot<DocumentData>): Expense[] {
 }
 
 export async function listExpensesForDateRange(startDate: string, endDate: string): Promise<Expense[]> {
-  const q = query(
-    collection(db, "expenses"),
-    where("date", ">=", startDate),
-    where("date", "<", endDate),
-    orderBy("date", "desc")
-  );
-  const snapshot = await getDocs(q);
-  return mapExpenses(snapshot);
+  return readThroughCache(`expenses/range/${startDate}/${endDate}`, async () => {
+    const q = query(
+      collection(db, "expenses"),
+      where("date", ">=", startDate),
+      where("date", "<", endDate),
+      orderBy("date", "desc")
+    );
+    const snapshot = await getDocs(q);
+    return mapExpenses(snapshot);
+  });
 }
 
 // Mantida para telas que precisam consultar o histórico completo.
 export async function listAllExpenses(): Promise<Expense[]> {
-  const snapshot = await getDocs(query(collection(db, "expenses"), orderBy("date", "desc")));
-  return mapExpenses(snapshot);
+  return readThroughCache("expenses/all", async () => {
+    const snapshot = await getDocs(query(collection(db, "expenses"), orderBy("date", "desc")));
+    return mapExpenses(snapshot);
+  });
 }
 
 export function isExpenseOverdue(expense: Expense, today: string): boolean {

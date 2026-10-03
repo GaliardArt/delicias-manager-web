@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Plus, Wheat, Search, ChevronRight } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
@@ -11,30 +11,37 @@ import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { InsumoForm } from "@/features/insumos/components/InsumoForm";
-import { listAllInsumos } from "@/lib/firebase/insumos";
+import { listInsumosPage } from "@/lib/firebase/insumos";
 import { Insumo } from "@/types";
 import { formatCurrencyBRL } from "@/lib/utils/format";
+import { PaginationControls } from "@/components/ui/PaginationControls";
+import type { QueryDocumentSnapshot } from "firebase/firestore";
 
 export default function InsumosPage() {
   const [insumos, setInsumos] = useState<Insumo[] | null>(null);
   const [error, setError] = useState(false);
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [cursors, setCursors] = useState<(QueryDocumentSnapshot | null)[]>([null]);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const nextCursor = useRef<QueryDocumentSnapshot | null>(null);
 
   async function load() {
     setError(false);
     setInsumos(null);
     try {
-      setInsumos(await listAllInsumos());
+      const result = await listInsumosPage(cursors[page - 1] ?? null);
+      setInsumos(result.items);
+      setHasNextPage(result.hasMore);
+      nextCursor.current = result.nextCursor;
     } catch (err) {
       console.error(err);
       setError(true);
     }
   }
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, [page]);
 
   const term = search.toLowerCase();
   const filtered = insumos?.filter((i) => i.name.toLowerCase().includes(term));
@@ -50,7 +57,7 @@ export default function InsumosPage() {
         <div className="relative w-full md:max-w-xs">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
           <Input
-            placeholder="Buscar por nome"
+            placeholder="Buscar nesta página"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -118,11 +125,27 @@ export default function InsumosPage() {
         </Card>
       )}
 
+      {insumos !== null && insumos.length > 0 && (
+        <PaginationControls
+          page={page}
+          hasPrevious={page > 1}
+          hasNext={hasNextPage}
+          onPrevious={() => setPage((value) => Math.max(1, value - 1))}
+          onNext={() => {
+            if (!nextCursor.current) return;
+            setCursors((value) => [...value.slice(0, page), nextCursor.current]);
+            setPage((value) => value + 1);
+          }}
+        />
+      )}
+
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Novo insumo" maxWidthClassName="max-w-lg" fixedContent>
         <InsumoForm
-          onSuccess={() => {
+          onSuccess={(savedInsumo) => {
             setModalOpen(false);
-            load();
+            setInsumos((current) => current
+              ? [...current.filter((item) => item.id !== savedInsumo.id), savedInsumo].sort((a, b) => a.name.localeCompare(b.name)).slice(0, 25)
+              : [savedInsumo]);
           }}
         />
       </Modal>

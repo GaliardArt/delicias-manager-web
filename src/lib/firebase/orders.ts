@@ -21,6 +21,7 @@ import { normalizeSaleItems } from "@/lib/utils/normalize-items";
 import { todayLocalIso } from "@/lib/utils/format";
 import { normalizeOrderStatus } from "@/lib/utils/order-status";
 import { ensureOpenSalesDay } from "./sales-days";
+import { readThroughCache } from "./read-cache";
 
 function tsToIso(value: unknown): string {
   if (value instanceof Timestamp) return value.toDate().toISOString();
@@ -142,6 +143,7 @@ export function isOrderCompleted(order: Pick<OrderListItem, "status">): boolean 
 }
 
 export async function listRecentOrders(max = 150): Promise<OrderListItem[]> {
+  return readThroughCache(`orders/recent/${max}`, async () => {
   const q = query(
     collection(db, "orders"),
     orderBy("expectedDate", "asc"),
@@ -162,9 +164,11 @@ export async function listRecentOrders(max = 150): Promise<OrderListItem[]> {
       items: normalizeSaleItems(data.items),
     };
   });
+  });
 }
 
 export async function getOrderWithPayments(orderId: string): Promise<Order | null> {
+  return readThroughCache(`orders/${orderId}/detail`, async () => {
   const orderSnap = await getDoc(doc(db, "orders", orderId));
   if (!orderSnap.exists()) return null;
   const data = orderSnap.data();
@@ -199,6 +203,7 @@ export async function getOrderWithPayments(orderId: string): Promise<Order | nul
     status: normalizeOrderStatus(data.status),
     payments,
   } as Order & { payments: Payment[] };
+  });
 }
 
 // Mesma lógica transacional da Fase 3: nunca deixa paidCents ultrapassar o total,

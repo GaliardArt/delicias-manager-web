@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Plus, Cookie, Search, ChevronRight } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
@@ -11,10 +11,12 @@ import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { ProductForm } from "@/features/products/components/ProductForm";
-import { listAllProducts } from "@/lib/firebase/products";
+import { listProductsPage } from "@/lib/firebase/products";
 import { listAllIngredientesAndInsumos } from "@/lib/firebase/ingredientes";
 import { Product, Insumo, Ingrediente } from "@/types";
 import { formatCurrencyBRL } from "@/lib/utils/format";
+import { PaginationControls } from "@/components/ui/PaginationControls";
+import type { QueryDocumentSnapshot } from "firebase/firestore";
 
 export default function ProdutosPage() {
   const [products, setProducts] = useState<Product[] | null>(null);
@@ -23,27 +25,41 @@ export default function ProdutosPage() {
   const [error, setError] = useState(false);
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [cursors, setCursors] = useState<(QueryDocumentSnapshot | null)[]>([null]);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [optionsLoaded, setOptionsLoaded] = useState(false);
+  const optionsLoading = useRef(false);
+  const nextCursor = useRef<QueryDocumentSnapshot | null>(null);
 
   async function load() {
     setError(false);
     setProducts(null);
     try {
-      const [prod, ingredientData] = await Promise.all([
-        listAllProducts(),
-        listAllIngredientesAndInsumos(),
-      ]);
-      setProducts(prod);
-      setInsumos(ingredientData.insumos);
-      setIngredientes(ingredientData.ingredientes);
+      const result = await listProductsPage(cursors[page - 1] ?? null);
+      setProducts(result.items);
+      setHasNextPage(result.hasMore);
+      nextCursor.current = result.nextCursor;
     } catch (err) {
       console.error(err);
       setError(true);
     }
   }
 
+  useEffect(() => { load(); }, [page]);
+
   useEffect(() => {
-    load();
-  }, []);
+    if (!modalOpen || optionsLoaded || optionsLoading.current) return;
+    optionsLoading.current = true;
+    listAllIngredientesAndInsumos()
+      .then((data) => {
+        setInsumos(data.insumos);
+        setIngredientes(data.ingredientes);
+        setOptionsLoaded(true);
+      })
+      .catch((err) => { console.error(err); setError(true); })
+      .finally(() => { optionsLoading.current = false; });
+  }, [modalOpen, optionsLoaded]);
 
   const term = search.toLowerCase();
   const filtered = products?.filter(
@@ -56,7 +72,7 @@ export default function ProdutosPage() {
         <div className="relative w-full md:max-w-xs">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
           <Input
-            placeholder="Buscar por nome ou categoria"
+            placeholder="Buscar nesta página"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -131,15 +147,31 @@ export default function ProdutosPage() {
         </Card>
       )}
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Novo produto" maxWidthClassName="max-w-xl" fixedContent>
-        <ProductForm
-          insumos={insumos}
-          ingredientes={ingredientes}
-          onSuccess={() => {
-            setModalOpen(false);
-            load();
+      {products !== null && products.length > 0 && (
+        <PaginationControls
+          page={page}
+          hasPrevious={page > 1}
+          hasNext={hasNextPage}
+          onPrevious={() => setPage((value) => Math.max(1, value - 1))}
+          onNext={() => {
+            if (!nextCursor.current) return;
+            setCursors((value) => [...value.slice(0, page), nextCursor.current]);
+            setPage((value) => value + 1);
           }}
         />
+      )}
+
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Novo produto" maxWidthClassName="max-w-xl" fixedContent>
+        {optionsLoaded ? <ProductForm
+          insumos={insumos}
+          ingredientes={ingredientes}
+          onSuccess={(savedProduct) => {
+            setModalOpen(false);
+            setProducts((current) => current
+              ? [...current.filter((item) => item.id !== savedProduct.id), savedProduct].sort((a, b) => a.name.localeCompare(b.name)).slice(0, 25)
+              : [savedProduct]);
+          }}
+        /> : <div className="py-8 text-center text-sm text-ink-muted">Carregando ingredientes e insumos para a receita...</div>}
       </Modal>
     </AppShell>
   );

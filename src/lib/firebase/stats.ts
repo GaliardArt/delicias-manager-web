@@ -1,5 +1,6 @@
 import { collection, getDocs, orderBy, query, where } from "firebase/firestore";
 import { db } from "./config";
+import { readThroughCache } from "./read-cache";
 
 interface RawSaleDoc {
   customerId: string;
@@ -21,6 +22,7 @@ export interface CustomerStats {
 // Histórico básico do cliente (seção 8): agregado a partir das vendas dele.
 // Consulta direta por customerId — eficiente, não varre a coleção inteira.
 export async function getCustomerStats(customerId: string): Promise<CustomerStats> {
+  return readThroughCache(`stats/customer/${customerId}`, async () => {
   const q = query(collection(db, "sales"), where("customerId", "==", customerId));
   const snapshot = await getDocs(q);
   const sales = snapshot.docs.map((d) => d.data() as RawSaleDoc);
@@ -63,6 +65,7 @@ export async function getCustomerStats(customerId: string): Promise<CustomerStat
     lastPurchaseAt,
     topProductName,
   };
+  });
 }
 
 export interface ProductStats {
@@ -75,6 +78,7 @@ export interface ProductStats {
 // confeitaria pequena; se o catálogo de vendas crescer muito, vale revisar
 // (seção 28 — nunca fazer isso sem discutir antes, por ser mudança de arquitetura).
 export async function getProductStats(productId: string): Promise<ProductStats> {
+  return readThroughCache(`stats/product/${productId}`, async () => {
   const q = query(collection(db, "sales"), orderBy("createdAt", "desc"));
   const snapshot = await getDocs(q);
 
@@ -92,4 +96,5 @@ export async function getProductStats(productId: string): Promise<ProductStats> 
   }
 
   return { quantitySold, revenueCents };
+  });
 }

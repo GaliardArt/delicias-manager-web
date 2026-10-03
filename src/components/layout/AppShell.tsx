@@ -9,6 +9,8 @@ import { TopBar } from "./TopBar";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { PostLoginWelcome } from "./PostLoginWelcome";
+import { RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 interface AppShellProps {
   title: string;
@@ -55,9 +57,12 @@ export function AppShell({ title, children }: AppShellProps) {
           className="animate-page-in min-w-0 flex-1 px-4 pt-4 md:px-8 md:pb-8 md:pt-8"
           style={{ paddingBottom: "calc(6rem + env(safe-area-inset-bottom, 0px))" }}
         >
-          <h1 className="mb-6 hidden font-display text-2xl font-semibold text-ink md:block">
-            {title}
-          </h1>
+          <div className="mb-6 hidden items-center justify-between md:flex">
+            <h1 className="font-display text-2xl font-semibold text-ink">{title}</h1>
+            <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>
+              <RefreshCw className="h-4 w-4" /> Atualizar
+            </Button>
+          </div>
           {children}
         </main>
       </div>

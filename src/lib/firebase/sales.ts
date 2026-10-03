@@ -22,6 +22,7 @@ import { Payment, PaymentMethod, Sale, SaleItem } from "@/types";
 import { normalizeSaleItems } from "@/lib/utils/normalize-items";
 import { ensureOpenSalesDay } from "./sales-days";
 import { todayLocalIso } from "@/lib/utils/format";
+import { readThroughCache } from "./read-cache";
 
 function tsToIso(value: unknown): string {
   if (value instanceof Timestamp) return value.toDate().toISOString();
@@ -196,6 +197,7 @@ async function getSalesForList(
 // Lista as vendas mais recentes. Filtros mais elaborados (período, forma de
 // pagamento) ficam para quando houver necessidade real de escalar (seção 28).
 export async function listRecentSales(max = 100): Promise<SaleListItem[]> {
+  return readThroughCache(`sales/recent/${max}`, async () => {
   const sales = await getSalesForList(max, "recent");
   return sales.map((d) => {
     const data = d.data();
@@ -209,9 +211,11 @@ export async function listRecentSales(max = 100): Promise<SaleListItem[]> {
       itemsCount: Array.isArray(data.items) ? data.items.length : 0,
     };
   });
+  });
 }
 
 export async function listHistoricalSales(max = 150): Promise<SaleListItem[]> {
+  return readThroughCache(`sales/history/${max}`, async () => {
   const sales = await getSalesForList(max, "historical");
   return sales.map((d) => {
     const data = d.data();
@@ -225,9 +229,11 @@ export async function listHistoricalSales(max = 150): Promise<SaleListItem[]> {
       itemsCount: Array.isArray(data.items) ? data.items.length : 0,
     };
   });
+  });
 }
 
 export async function getSaleWithPayments(saleId: string): Promise<Sale | null> {
+  return readThroughCache(`sales/${saleId}/detail`, async () => {
   const saleSnap = await getDoc(doc(db, "sales", saleId));
   if (!saleSnap.exists()) return null;
   const data = saleSnap.data();
@@ -266,6 +272,7 @@ export async function getSaleWithPayments(saleId: string): Promise<Sale | null> 
     salesDayId: data.salesDayId,
     createdAt: tsToIso(data.createdAt),
   };
+  });
 }
 
 // Registra um novo pagamento sobre uma venda já existente (fiado quitado

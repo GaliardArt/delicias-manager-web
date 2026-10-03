@@ -9,7 +9,7 @@ import { createCustomer, updateCustomer } from "@/lib/firebase/customers";
 
 interface CustomerFormProps {
   customer?: Customer;
-  onSuccess: () => void;
+  onSuccess: (savedCustomer: Customer) => void;
 }
 
 export function CustomerForm({ customer, onSuccess }: CustomerFormProps) {
@@ -36,12 +36,15 @@ export function CustomerForm({ customer, onSuccess }: CustomerFormProps) {
     setSubmitting(true);
     try {
       const input = { name: name.trim(), phone: phone.trim(), address: address.trim(), notes: notes.trim() };
+      let savedCustomer: Customer;
       if (customer) {
         await updateCustomer(customer.id, input);
+        savedCustomer = { ...customer, ...input };
       } else {
-        await createCustomer(input);
+        const id = await createCustomer(input);
+        savedCustomer = { id, ...input, active: true, createdAt: new Date().toISOString() };
       }
-      onSuccess();
+      onSuccess(savedCustomer);
     } catch (err) {
       console.error(err);
       setError("Não foi possível salvar o cliente. Nenhum dado foi alterado.");

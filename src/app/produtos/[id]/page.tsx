@@ -317,9 +317,9 @@ export default function ProductDetailPage() {
             product={product}
             insumos={insumos}
             ingredientes={ingredientes}
-            onSuccess={() => {
+            onSuccess={(savedProduct) => {
               setEditOpen(false);
-              load();
+              setProduct(savedProduct);
             }}
           />
         )}

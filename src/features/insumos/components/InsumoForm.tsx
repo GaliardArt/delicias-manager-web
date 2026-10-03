@@ -19,7 +19,7 @@ const unitsWithBuiltInConversion = new Set(["g", "kg", "ml", "l", "unidade", "d�
 
 interface InsumoFormProps {
   insumo?: Insumo;
-  onSuccess: () => void;
+  onSuccess: (savedInsumo: Insumo) => void;
 }
 
 export function InsumoForm({ insumo, onSuccess }: InsumoFormProps) {
@@ -72,12 +72,31 @@ export function InsumoForm({ insumo, onSuccess }: InsumoFormProps) {
           ? { packageUnit: packageUnit.trim(), packageQuantity }
           : {}),
       };
+      let savedInsumo: Insumo;
       if (insumo) {
         await updateInsumo(insumo.id, input);
+        savedInsumo = {
+          ...insumo,
+          name: input.name,
+          unit: input.unit,
+          purchasePriceCents: input.purchasePriceCents,
+          purchaseQuantity: input.purchaseQuantity,
+          packageUnit: input.packageUnit,
+          packageQuantity: input.packageQuantity,
+          unitCostCents: input.purchaseQuantity > 0 ? input.purchasePriceCents / input.purchaseQuantity : 0,
+        };
       } else {
-        await createInsumo(input);
+        const id = await createInsumo(input);
+        savedInsumo = {
+          id,
+          ...input,
+          unitCostCents: input.purchaseQuantity > 0 ? input.purchasePriceCents / input.purchaseQuantity : 0,
+          stockQuantity: 0,
+          active: true,
+          createdAt: new Date().toISOString(),
+        };
       }
-      onSuccess();
+      onSuccess(savedInsumo);
     } catch (err) {
       console.error(err);
       setError("Não foi possível salvar o insumo. Nenhum dado foi alterado.");

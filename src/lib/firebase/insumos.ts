@@ -5,34 +5,59 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
   increment,
   orderBy,
+  QueryDocumentSnapshot,
   query,
+  startAfter,
   serverTimestamp,
   updateDoc,
   where,
 } from "firebase/firestore";
 import { db } from "./config";
 import { Insumo } from "@/types";
+import { FirestorePage, readThroughCache } from "./read-cache";
 
 export async function listActiveInsumos(): Promise<Insumo[]> {
-  const q = query(collection(db, "insumos"), where("active", "==", true));
-  const snapshot = await getDocs(q);
-  return snapshot.docs
-    .map((d) => ({ id: d.id, ...d.data() } as Insumo))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  return readThroughCache("insumos/active", async () => {
+    const q = query(collection(db, "insumos"), where("active", "==", true));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Insumo)).sort((a, b) => a.name.localeCompare(b.name));
+  });
 }
 
 export async function listAllInsumos(): Promise<Insumo[]> {
-  const q = query(collection(db, "insumos"), orderBy("name", "asc"));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Insumo));
+  return readThroughCache("insumos/all", async () => {
+    const q = query(collection(db, "insumos"), orderBy("name", "asc"));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Insumo));
+  });
+}
+
+export async function listInsumosPage(
+  cursor: QueryDocumentSnapshot | null,
+  pageSize = 25
+): Promise<FirestorePage<Insumo, QueryDocumentSnapshot>> {
+  const cursorKey = cursor?.id ?? "first";
+  return readThroughCache(`insumos/page/${cursorKey}/${pageSize}`, async () => {
+    const constraints = [orderBy("name", "asc"), ...(cursor ? [startAfter(cursor)] : []), limit(pageSize + 1)];
+    const snapshot = await getDocs(query(collection(db, "insumos"), ...constraints));
+    const docs = snapshot.docs.slice(0, pageSize);
+    return {
+      items: docs.map((d) => ({ id: d.id, ...d.data() } as Insumo)),
+      hasMore: snapshot.docs.length > pageSize,
+      nextCursor: docs[docs.length - 1] ?? null,
+    };
+  });
 }
 
 export async function getInsumo(id: string): Promise<Insumo | null> {
-  const snap = await getDoc(doc(db, "insumos", id));
-  if (!snap.exists()) return null;
-  return { id: snap.id, ...snap.data() } as Insumo;
+  return readThroughCache(`insumos/${id}`, async () => {
+    const snap = await getDoc(doc(db, "insumos", id));
+    if (!snap.exists()) return null;
+    return { id: snap.id, ...snap.data() } as Insumo;
+  });
 }
 
 interface InsumoInput {

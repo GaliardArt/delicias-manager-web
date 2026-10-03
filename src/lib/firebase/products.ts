@@ -6,14 +6,18 @@ import {
   getDoc,
   getDocs,
   increment,
+  limit,
   orderBy,
+  QueryDocumentSnapshot,
   query,
   serverTimestamp,
+  startAfter,
   updateDoc,
   where,
 } from "firebase/firestore";
 import { db } from "./config";
 import { ExtraCostMode, Product, RecipeItem } from "@/types";
+import { FirestorePage, readThroughCache } from "./read-cache";
 
 // Normaliza documentos antigos (de antes da receita/estoque existirem) com
 // valores padrão, em vez de deixar `undefined` vazar pro resto do app.
@@ -41,24 +45,45 @@ function mapProductDoc(id: string, data: DocumentData): Product {
 // Leitura só dos produtos ativos — usado no formulário de venda (Fase 3).
 // Ordena no cliente (não no Firestore) pelo mesmo motivo do customers.ts.
 export async function listActiveProducts(): Promise<Product[]> {
-  const q = query(collection(db, "products"), where("active", "==", true));
-  const snapshot = await getDocs(q);
-  return snapshot.docs
-    .map((d) => mapProductDoc(d.id, d.data()))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  return readThroughCache("products/active", async () => {
+    const q = query(collection(db, "products"), where("active", "==", true));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => mapProductDoc(d.id, d.data())).sort((a, b) => a.name.localeCompare(b.name));
+  });
 }
 
 // Lista todos os produtos (ativos e inativos) para a tela de gestão de produtos.
 export async function listAllProducts(): Promise<Product[]> {
-  const q = query(collection(db, "products"), orderBy("name", "asc"));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => mapProductDoc(d.id, d.data()));
+  return readThroughCache("products/all", async () => {
+    const q = query(collection(db, "products"), orderBy("name", "asc"));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => mapProductDoc(d.id, d.data()));
+  });
+}
+
+export async function listProductsPage(
+  cursor: QueryDocumentSnapshot | null,
+  pageSize = 25
+): Promise<FirestorePage<Product, QueryDocumentSnapshot>> {
+  const cursorKey = cursor?.id ?? "first";
+  return readThroughCache(`products/page/${cursorKey}/${pageSize}`, async () => {
+    const constraints = [orderBy("name", "asc"), ...(cursor ? [startAfter(cursor)] : []), limit(pageSize + 1)];
+    const snapshot = await getDocs(query(collection(db, "products"), ...constraints));
+    const docs = snapshot.docs.slice(0, pageSize);
+    return {
+      items: docs.map((d) => mapProductDoc(d.id, d.data())),
+      hasMore: snapshot.docs.length > pageSize,
+      nextCursor: docs[docs.length - 1] ?? null,
+    };
+  });
 }
 
 export async function getProduct(id: string): Promise<Product | null> {
-  const snap = await getDoc(doc(db, "products", id));
-  if (!snap.exists()) return null;
-  return mapProductDoc(snap.id, snap.data());
+  return readThroughCache(`products/${id}`, async () => {
+    const snap = await getDoc(doc(db, "products", id));
+    if (!snap.exists()) return null;
+    return mapProductDoc(snap.id, snap.data());
+  });
 }
 
 interface ProductInput {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Plus, Users, Search, ChevronRight } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
@@ -11,30 +11,40 @@ import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { CustomerForm } from "@/features/customers/components/CustomerForm";
-import { listAllCustomers } from "@/lib/firebase/customers";
+import { listCustomersPage, primeCustomersCache } from "@/lib/firebase/customers";
 import { Customer } from "@/types";
 import { formatPhoneBR } from "@/lib/utils/format";
+import { PaginationControls } from "@/components/ui/PaginationControls";
+import type { QueryDocumentSnapshot } from "firebase/firestore";
 
 export default function ClientesPage() {
   const [customers, setCustomers] = useState<Customer[] | null>(null);
   const [error, setError] = useState(false);
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [cursors, setCursors] = useState<(QueryDocumentSnapshot | null)[]>([null]);
+  const [hasNextPage, setHasNextPage] = useState(false);
 
   async function load() {
     setError(false);
     setCustomers(null);
     try {
-      setCustomers(await listAllCustomers());
+      const result = await listCustomersPage(cursors[page - 1] ?? null);
+      setCustomers(result.items);
+      setHasNextPage(result.hasMore);
+      nextCursor.current = result.nextCursor;
     } catch (err) {
       console.error(err);
       setError(true);
     }
   }
 
+  const nextCursor = useRef<QueryDocumentSnapshot | null>(null);
+
   useEffect(() => {
     load();
-  }, []);
+  }, [page]);
 
   const term = search.toLowerCase();
   const filtered = customers?.filter(
@@ -43,11 +53,12 @@ export default function ClientesPage() {
 
   return (
     <AppShell title="Clientes">
+      <p className="mb-3 text-xs text-ink-muted">Página atual em cache. Use Atualizar para buscar dados recentes.</p>
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="relative w-full md:max-w-xs">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
           <Input
-            placeholder="Buscar por nome ou telefone"
+            placeholder="Buscar nesta página"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -114,11 +125,32 @@ export default function ClientesPage() {
         </Card>
       )}
 
+      {customers !== null && customers.length > 0 && (
+        <PaginationControls
+          page={page}
+          hasPrevious={page > 1}
+          hasNext={hasNextPage}
+          onPrevious={() => setPage((value) => Math.max(1, value - 1))}
+          onNext={() => {
+            if (!nextCursor.current) return;
+            setCursors((value) => [...value.slice(0, page), nextCursor.current]);
+            setPage((value) => value + 1);
+          }}
+        />
+      )}
+
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Novo cliente" maxWidthClassName="max-w-sm" fixedContent>
         <CustomerForm
-          onSuccess={() => {
+          onSuccess={(savedCustomer) => {
             setModalOpen(false);
-            load();
+            if (customers === null) {
+              load();
+              return;
+            }
+            const updated = [...(customers ?? []).filter((customer) => customer.id !== savedCustomer.id), savedCustomer]
+              .sort((a, b) => a.name.localeCompare(b.name));
+            setCustomers(updated);
+            primeCustomersCache(updated);
           }}
         />
       </Modal>

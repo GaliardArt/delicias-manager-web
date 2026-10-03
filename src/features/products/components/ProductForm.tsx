@@ -28,7 +28,7 @@ interface ProductFormProps {
   product?: Product;
   insumos: Insumo[];
   ingredientes: Ingrediente[];
-  onSuccess: () => void;
+  onSuccess: (savedProduct: Product) => void;
 }
 
 export function ProductForm({ product, insumos, ingredientes, onSuccess }: ProductFormProps) {
@@ -136,12 +136,15 @@ export function ProductForm({ product, insumos, ingredientes, onSuccess }: Produ
         extraCostMode: legacyExtraCost.mode,
         extraCostPct,
       };
+      let savedProduct: Product;
       if (product) {
         await updateProduct(product.id, input);
+        savedProduct = { ...product, ...input };
       } else {
-        await createProduct(input);
+        const id = await createProduct(input);
+        savedProduct = { id, ...input, active: true, stockQuantity: 0, createdAt: new Date().toISOString() };
       }
-      onSuccess();
+      onSuccess(savedProduct);
     } catch (err) {
       console.error(err);
       setError("Não foi possível salvar o produto. Nenhum dado foi alterado.");

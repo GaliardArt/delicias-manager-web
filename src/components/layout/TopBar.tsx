@@ -1,6 +1,6 @@
 "use client";
 
-import { Settings } from "lucide-react";
+import { RefreshCw, Settings } from "lucide-react";
 import Link from "next/link";
 import type { UserProfile } from "@/lib/firebase/users";
 
@@ -42,6 +42,15 @@ export function TopBar({
           </div>
         </div>
       </div>
+      <div className="flex shrink-0 items-center gap-2">
+      <button
+        type="button"
+        onClick={() => window.location.reload()}
+        className="flex h-9 items-center gap-1.5 rounded-full bg-babypink px-3 text-xs font-medium text-brand-700"
+        aria-label="Atualizar dados"
+      >
+        <RefreshCw className="h-3.5 w-3.5" /> Atualizar
+      </button>
       <Link
         href="/configuracoes"
         className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-muted text-ink-muted"
@@ -49,6 +58,7 @@ export function TopBar({
       >
         <Settings className="h-[18px] w-[18px]" />
       </Link>
+      </div>
     </header>
   );
 }

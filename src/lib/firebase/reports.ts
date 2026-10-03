@@ -9,6 +9,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "./config";
+import { readThroughCache } from "./read-cache";
 import { Customer, Ingrediente, Insumo, Product, OrderStatus } from "@/types";
 import { normalizeOrderStatus } from "@/lib/utils/order-status";
 import {
@@ -95,6 +96,7 @@ function mapSalesSnapshot(snapshot: QuerySnapshot<DocumentData>): RawSale[] {
 // Uma única leitura da coleção `sales` — tudo o mais é calculado em memória.
 // Quando a tela precisa de um dia, a consulta fica restrita ao intervalo local.
 export async function getAllSalesRaw(date?: string): Promise<RawSale[]> {
+  return readThroughCache(`reports/sales/${date ?? "all"}`, async () => {
   const salesCollection = collection(db, "sales");
   let salesQuery: Query<DocumentData> = salesCollection;
   if (date) {
@@ -109,9 +111,11 @@ export async function getAllSalesRaw(date?: string): Promise<RawSale[]> {
   }
   const snapshot = await getDocs(salesQuery);
   return mapSalesSnapshot(snapshot);
+  });
 }
 
 export async function getSalesFromDateRaw(date: string): Promise<RawSale[]> {
+  return readThroughCache(`reports/sales-from/${date}`, async () => {
   const start = new Date(`${date}T00:00:00`);
   const snapshot = await getDocs(
     query(
@@ -120,9 +124,11 @@ export async function getSalesFromDateRaw(date: string): Promise<RawSale[]> {
     )
   );
   return mapSalesSnapshot(snapshot);
+  });
 }
 
 export async function getAllOrdersRaw(): Promise<RawOrder[]> {
+  return readThroughCache("reports/orders/all", async () => {
   const snapshot = await getDocs(collection(db, "orders"));
   return snapshot.docs.map((d) => {
     const data = d.data();
@@ -149,6 +155,7 @@ export async function getAllOrdersRaw(): Promise<RawOrder[]> {
         totalCents: Number(item.totalCents ?? 0),
       })),
     };
+  });
   });
 }
 

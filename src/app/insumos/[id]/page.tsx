@@ -122,7 +122,7 @@ export default function InsumoDetailPage() {
       )}
 
       <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Editar insumo" maxWidthClassName="max-w-lg" fixedContent>
-        {insumo && <InsumoForm insumo={insumo} onSuccess={() => { setEditOpen(false); load(); }} />}
+        {insumo && <InsumoForm insumo={insumo} onSuccess={(savedInsumo) => { setEditOpen(false); setInsumo(savedInsumo); }} />}
       </Modal>
 
       <Modal open={purchaseOpen} onClose={() => setPurchaseOpen(false)} title="Registrar compra" maxWidthClassName="max-w-sm" fixedContent>

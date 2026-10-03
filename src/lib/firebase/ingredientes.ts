@@ -15,6 +15,7 @@ import {
 import { db } from "./config";
 import { Ingrediente, Insumo, RecipeItem } from "@/types";
 import { resolveIngredienteUnitCost, toInsumosMap, toIngredientesMap } from "@/lib/costing";
+import { readThroughCache } from "./read-cache";
 
 /**
  * Sempre calcula o custo atual dos ingredientes a partir dos insumos e
@@ -29,6 +30,7 @@ async function loadIngredientesWithCurrentCost(): Promise<{
   ingredientes: Ingrediente[];
   insumos: Insumo[];
 }> {
+  return readThroughCache("ingredients/with-current-cost", async () => {
   const [ingredientesSnap, insumosSnap] = await Promise.all([
     getDocs(query(collection(db, "ingredientes"), orderBy("name", "asc"))),
     getDocs(query(collection(db, "insumos"), orderBy("name", "asc"))),
@@ -54,6 +56,7 @@ async function loadIngredientesWithCurrentCost(): Promise<{
   }));
 
   return { ingredientes: current, insumos };
+  });
 }
 
 export async function listActiveIngredientes(): Promise<Ingrediente[]> {

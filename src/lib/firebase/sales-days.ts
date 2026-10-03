@@ -12,12 +12,23 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
-import { db } from "./config";
+import { auth, db } from "./config";
 import { Order } from "@/types";
 import { getAllSalesRaw, getSalesFromDateRaw, RawSale, summarizeSales, SalesSummary } from "./reports";
 import { normalizeSaleItems } from "@/lib/utils/normalize-items";
 import { normalizeOrderStatus } from "@/lib/utils/order-status";
 import { todayLocalIso } from "@/lib/utils/format";
+import { readThroughCache } from "./read-cache";
+
+const openDayCache = new Map<string, OpenDayGroupsData>();
+const openDayRequests = new Map<string, Promise<OpenDayGroupsData>>();
+let openDayCacheGeneration = 0;
+
+export function invalidateOpenDayGroupsCache(): void {
+  openDayCacheGeneration += 1;
+  openDayCache.clear();
+  openDayRequests.clear();
+}
 
 function tsToIso(value: unknown): string {
   if (value instanceof Timestamp) return value.toDate().toISOString();
@@ -139,6 +150,12 @@ export interface OpenDayGroup {
   totalCents: number;
 }
 
+export interface OpenDayGroupsData {
+  groups: OpenDayGroup[];
+  orders: Order[];
+  sales: RawSale[];
+}
+
 /**
  * Garante que exista um documento para o Dia de Venda enquanto ele estiver aberto.
  * O documento usa a própria data como ID para ser determinístico.
@@ -185,7 +202,7 @@ export async function ensureOpenSalesDay(date: string): Promise<string> {
 // ou venda e seus dados operacionais continuam sendo calculados ao vivo aqui.
 // Agrupa por data tanto as encomendas (por data prevista de entrega) quanto as
 // vendas do dia (por data da venda). Datas já encerradas ficam fora da lista aberta.
-export async function getOpenDayGroups(fromDate?: string): Promise<OpenDayGroup[]> {
+async function fetchOpenDayGroups(fromDate?: string): Promise<OpenDayGroupsData> {
   const salesDaysQuery = query(
     collection(db, "salesDays"),
     where("closed", "==", true)
@@ -209,13 +226,12 @@ export async function getOpenDayGroups(fromDate?: string): Promise<OpenDayGroup[
   );
   const orderGroups = new Map<string, Order[]>();
   const salesGroups = new Map<string, RawSale[]>();
+  const orders = ordersSnap.docs.map((d) => mapOrderDoc(d.id, d.data()));
 
-  for (const d of ordersSnap.docs) {
-    const data = d.data();
-    if (data.status === "cancelada") continue;
-    if (fromDate && data.expectedDate < fromDate) continue;
-    if (closedDates.has(data.expectedDate)) continue;
-    const order = mapOrderDoc(d.id, data);
+  for (const order of orders) {
+    if (order.status === "cancelada") continue;
+    if (fromDate && order.expectedDate < fromDate) continue;
+    if (closedDates.has(order.expectedDate)) continue;
     if (!orderGroups.has(order.expectedDate)) orderGroups.set(order.expectedDate, []);
     orderGroups.get(order.expectedDate)!.push(order);
   }
@@ -230,7 +246,7 @@ export async function getOpenDayGroups(fromDate?: string): Promise<OpenDayGroup[
 
   const allDates = new Set([...orderGroups.keys(), ...salesGroups.keys()]);
 
-  return Array.from(allDates)
+  const groups = Array.from(allDates)
     .map((date) => {
       const orders = orderGroups.get(date) ?? [];
       const sales = salesGroups.get(date) ?? [];
@@ -244,15 +260,43 @@ export async function getOpenDayGroups(fromDate?: string): Promise<OpenDayGroup[
       };
     })
     .sort((a, b) => a.date.localeCompare(b.date));
+  return { groups, orders, sales: allSales };
+}
+
+export async function getOpenDayGroupsData(fromDate?: string): Promise<OpenDayGroupsData> {
+  const cacheKey = `${auth.currentUser?.uid ?? "anonymous"}:${fromDate ?? "all"}`;
+  const cached = openDayCache.get(cacheKey);
+  if (cached) return cached;
+  const pending = openDayRequests.get(cacheKey);
+  if (pending) return pending;
+
+  const generation = openDayCacheGeneration;
+  const request = fetchOpenDayGroups(fromDate)
+    .then((groups) => {
+      if (generation === openDayCacheGeneration) {
+        openDayCache.set(cacheKey, groups);
+      }
+      return groups;
+    })
+    .finally(() => {
+      if (openDayRequests.get(cacheKey) === request) openDayRequests.delete(cacheKey);
+    });
+  openDayRequests.set(cacheKey, request);
+  return request;
+}
+
+export async function getOpenDayGroups(fromDate?: string): Promise<OpenDayGroup[]> {
+  const data = await getOpenDayGroupsData(fromDate);
+  return data.groups;
 }
 
 // Só as encomendas ativas de uma data — usado na tela de fechamento.
 export async function getActiveOrdersForDate(date: string): Promise<Order[]> {
-  const q = query(collection(db, "orders"), where("expectedDate", "==", date));
-  const snapshot = await getDocs(q);
-  return snapshot.docs
-    .map((d) => mapOrderDoc(d.id, d.data()))
-    .filter((o) => o.status !== "cancelada");
+  return readThroughCache(`sales-days/orders/${date}`, async () => {
+    const q = query(collection(db, "orders"), where("expectedDate", "==", date));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => mapOrderDoc(d.id, d.data())).filter((o) => o.status !== "cancelada");
+  });
 }
 
 // Vendas (não-encomenda) feitas numa data específica — usado na tela de
@@ -345,15 +389,17 @@ export async function closeDay(
 }
 
 export async function listClosedDays(): Promise<SalesDayDoc[]> {
-  const q = query(collection(db, "salesDays"), orderBy("date", "desc"));
-  const snapshot = await getDocs(q);
-  return snapshot.docs
-    .filter((d) => d.data().closed === true)
-    .map((d) => ({
-    id: d.id,
-    ...(d.data() as Omit<SalesDayDoc, "id" | "createdAt">),
-    createdAt: tsToIso(d.data().createdAt),
-    }));
+  return readThroughCache("sales-days/closed", async () => {
+    const q = query(collection(db, "salesDays"), orderBy("date", "desc"));
+    const snapshot = await getDocs(q);
+    return snapshot.docs
+      .filter((d) => d.data().closed === true)
+      .map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<SalesDayDoc, "id" | "createdAt">),
+        createdAt: tsToIso(d.data().createdAt),
+      }));
+  });
 }
 
 // Detalhe de um dia já fechado — busca as encomendas daquela data (aqui sim
@@ -363,6 +409,7 @@ export async function listClosedDays(): Promise<SalesDayDoc[]> {
 export async function getClosedDayWithOrders(
   dayId: string
 ): Promise<{ day: SalesDayDoc; orders: Order[] } | null> {
+  return readThroughCache(`sales-days/closed/${dayId}`, async () => {
   const daySnap = await getDoc(doc(db, "salesDays", dayId));
   if (!daySnap.exists() || daySnap.data().closed !== true) return null;
   const day = {
@@ -377,6 +424,7 @@ export async function getClosedDayWithOrders(
   const orders = ordersSnap.docs.map((d) => mapOrderDoc(d.id, d.data()));
 
   return { day, orders };
+  });
 }
 
 export { todayIso };

@@ -155,9 +155,9 @@ export default function CustomerDetailPage() {
         {customer && (
           <CustomerForm
             customer={customer}
-            onSuccess={() => {
+            onSuccess={(savedCustomer) => {
               setEditOpen(false);
-              load();
+              setCustomer(savedCustomer);
             }}
           />
         )}

@@ -1,84 +1,20 @@
-import { collection, getDocs, limit, orderBy, query, Timestamp, where } from "firebase/firestore";
+import { collection, getDocs, limit, orderBy, query, Timestamp } from "firebase/firestore";
 import { db } from "./config";
-import { ActivityEvent, DashboardSummary, Order, SalesDay } from "@/types";
-import { getOpenDayGroups, summarizeOrders, todayIso } from "./sales-days";
+import { ActivityEvent, DashboardSummary, SalesDay } from "@/types";
+import { getOpenDayGroupsData, summarizeOrders, todayIso } from "./sales-days";
 import { summarizeSales } from "./reports";
-import { normalizeSaleItems } from "@/lib/utils/normalize-items";
-import { normalizeOrderStatus } from "@/lib/utils/order-status";
+import { readThroughCache } from "./read-cache";
 
 function tsToIso(value: unknown): string {
   if (value instanceof Timestamp) return value.toDate().toISOString();
   return new Date().toISOString();
 }
 
-async function getTodaySalesTotals() {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
-
-  const q = query(
-    collection(db, "sales"),
-    where("createdAt", ">=", Timestamp.fromDate(start)),
-    where("createdAt", "<", Timestamp.fromDate(end))
-  );
-  const snapshot = await getDocs(q);
-
-  let todaySalesCents = 0;
-  let todayReceivedCents = 0;
-  let pendingCents = 0;
-  let fiadoCents = 0;
-
-  for (const doc of snapshot.docs) {
-    const sale = doc.data();
-    todaySalesCents += sale.totalCents;
-    todayReceivedCents += sale.paidCents;
-    pendingCents += sale.pendingCents;
-    if (sale.paidCents === 0) fiadoCents += sale.totalCents;
-  }
-
-  return { todaySalesCents, todayReceivedCents, pendingCents, fiadoCents, salesCount: snapshot.size };
-}
-
-async function getUpcomingOrders(): Promise<Order[]> {
-  const q = query(
-    collection(db, "orders"),
-    where("expectedDate", ">=", todayIso()),
-    orderBy("expectedDate", "asc"),
-    limit(15)
-  );
-  const snapshot = await getDocs(q);
-
-  return snapshot.docs
-    .map((d) => {
-      const data = d.data();
-      return {
-        id: d.id,
-        customerId: data.customerId,
-        customerName: data.customerName,
-        items: normalizeSaleItems(data.items),
-        totalCents: data.totalCents,
-        paidCents: data.paidCents,
-        pendingCents: data.pendingCents,
-        payments: [],
-        orderDate: data.orderDate,
-        expectedDate: data.expectedDate,
-        deliveryAddress: data.deliveryAddress,
-        notes: data.notes,
-        status: normalizeOrderStatus(data.status),
-      } as Order;
-    })
-    .filter((o) => o.status !== "finalizada" && o.status !== "cancelada")
-    .slice(0, 5);
-}
-
 // Próximo Dia de Venda: o primeiro grupo automático (encomendas agrupadas por
 // data, ainda sem fechamento) a partir de hoje. Não existe mais um documento
 // "aberto" no Firestore — o grupo é calculado ao vivo (Fase Dias de Venda
 // automáticos).
-async function getNextSalesDay(): Promise<SalesDay | null> {
-  const today = todayIso();
-  const groups = await getOpenDayGroups(today);
+function getNextSalesDay(groups: Awaited<ReturnType<typeof getOpenDayGroupsData>>["groups"], today: string): SalesDay | null {
   const next = groups.find((g) => g.date >= today);
   if (!next) return null;
 
@@ -114,17 +50,38 @@ async function getRecentActivity(): Promise<ActivityEvent[]> {
 }
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
-  const [salesTotals, upcomingOrders, nextSalesDay, recentActivity] = await Promise.all([
-    getTodaySalesTotals(),
-    getUpcomingOrders(),
-    getNextSalesDay(),
+  return readThroughCache("dashboard/summary", async () => {
+  const today = todayIso();
+  const [dayData, recentActivity] = await Promise.all([
+    getOpenDayGroupsData(today),
     getRecentActivity(),
   ]);
 
+  const todaySales = dayData.sales.filter((sale) => {
+    const date = sale.createdAt;
+    const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    return dateKey === today;
+  });
+  const todaySalesSummary = summarizeSales(todaySales);
+  const fiadoCents = todaySales.reduce(
+    (sum, sale) => sum + (sale.paidCents === 0 ? sale.totalCents : 0),
+    0
+  );
+  const upcomingOrders = [...dayData.orders]
+    .sort((a, b) => a.expectedDate.localeCompare(b.expectedDate))
+    .slice(0, 15)
+    .filter((order) => order.status !== "finalizada" && order.status !== "cancelada")
+    .slice(0, 5);
+
   return {
-    ...salesTotals,
+    todaySalesCents: todaySalesSummary.faturamentoLiquidoCents,
+    todayReceivedCents: todaySalesSummary.recebidoCents,
+    pendingCents: todaySalesSummary.pendenteCents,
+    fiadoCents,
+    salesCount: todaySales.length,
     upcomingOrders,
-    nextSalesDay,
+    nextSalesDay: getNextSalesDay(dayData.groups, today),
     recentActivity,
   };
+  });
 }
