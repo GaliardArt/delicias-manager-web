@@ -12,8 +12,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { ProductForm } from "@/features/products/components/ProductForm";
 import { listAllProducts } from "@/lib/firebase/products";
-import { listAllInsumos } from "@/lib/firebase/insumos";
-import { listAllIngredientes } from "@/lib/firebase/ingredientes";
+import { listAllIngredientesAndInsumos } from "@/lib/firebase/ingredientes";
 import { Product, Insumo, Ingrediente } from "@/types";
 import { formatCurrencyBRL } from "@/lib/utils/format";
 
@@ -29,14 +28,13 @@ export default function ProdutosPage() {
     setError(false);
     setProducts(null);
     try {
-      const [prod, ins, ing] = await Promise.all([
+      const [prod, ingredientData] = await Promise.all([
         listAllProducts(),
-        listAllInsumos(),
-        listAllIngredientes(),
+        listAllIngredientesAndInsumos(),
       ]);
       setProducts(prod);
-      setInsumos(ins);
-      setIngredientes(ing);
+      setInsumos(ingredientData.insumos);
+      setIngredientes(ingredientData.ingredientes);
     } catch (err) {
       console.error(err);
       setError(true);

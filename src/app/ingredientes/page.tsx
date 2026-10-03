@@ -11,8 +11,7 @@ import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { IngredienteForm } from "@/features/ingredientes/components/IngredienteForm";
-import { listAllIngredientes } from "@/lib/firebase/ingredientes";
-import { listAllInsumos } from "@/lib/firebase/insumos";
+import { listAllIngredientesAndInsumos } from "@/lib/firebase/ingredientes";
 import { Ingrediente, Insumo } from "@/types";
 import { formatCurrencyBRL } from "@/lib/utils/format";
 
@@ -27,9 +26,9 @@ export default function IngredientesPage() {
     setError(false);
     setIngredientes(null);
     try {
-      const [ing, ins] = await Promise.all([listAllIngredientes(), listAllInsumos()]);
-      setIngredientes(ing);
-      setInsumos(ins);
+      const data = await listAllIngredientesAndInsumos();
+      setIngredientes(data.ingredientes);
+      setInsumos(data.insumos);
     } catch (err) {
       console.error(err);
       setError(true);

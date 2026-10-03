@@ -19,8 +19,7 @@ import {
   getProduct,
   setProductActive,
 } from "@/lib/firebase/products";
-import { listAllInsumos } from "@/lib/firebase/insumos";
-import { listAllIngredientes } from "@/lib/firebase/ingredientes";
+import { listAllIngredientesAndInsumos } from "@/lib/firebase/ingredientes";
 import { getProductStats, ProductStats } from "@/lib/firebase/stats";
 import {
   getProductExtraCost,
@@ -51,16 +50,15 @@ export default function ProductDetailPage() {
     setError(false);
     setProduct(undefined);
     try {
-      const [p, s, ins, ing] = await Promise.all([
+      const [p, s, ingredientData] = await Promise.all([
         getProduct(params.id),
         getProductStats(params.id),
-        listAllInsumos(),
-        listAllIngredientes(),
+        listAllIngredientesAndInsumos(),
       ]);
       setProduct(p);
       setStats(s);
-      setInsumos(ins);
-      setIngredientes(ing);
+      setInsumos(ingredientData.insumos);
+      setIngredientes(ingredientData.ingredientes);
     } catch (err) {
       console.error(err);
       setError(true);

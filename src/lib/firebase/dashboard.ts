@@ -77,8 +77,8 @@ async function getUpcomingOrders(): Promise<Order[]> {
 // "aberto" no Firestore — o grupo é calculado ao vivo (Fase Dias de Venda
 // automáticos).
 async function getNextSalesDay(): Promise<SalesDay | null> {
-  const groups = await getOpenDayGroups();
   const today = todayIso();
+  const groups = await getOpenDayGroups(today);
   const next = groups.find((g) => g.date >= today);
   if (!next) return null;
 

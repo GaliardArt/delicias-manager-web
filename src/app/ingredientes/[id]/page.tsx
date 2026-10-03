@@ -14,13 +14,11 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { StockAdjustDialog } from "@/components/ui/StockAdjustDialog";
 import { IngredienteForm } from "@/features/ingredientes/components/IngredienteForm";
 import {
-  getIngrediente,
   setIngredienteActive,
   deleteIngrediente,
   adjustIngredienteStock,
-  listAllIngredientes,
+  listAllIngredientesAndInsumos,
 } from "@/lib/firebase/ingredientes";
-import { listAllInsumos } from "@/lib/firebase/insumos";
 import { Ingrediente, Insumo } from "@/types";
 import { formatCurrencyBRL } from "@/lib/utils/format";
 
@@ -40,14 +38,10 @@ export default function IngredienteDetailPage() {
     setError(false);
     setIngrediente(undefined);
     try {
-      const [ing, ins, all] = await Promise.all([
-        getIngrediente(params.id),
-        listAllInsumos(),
-        listAllIngredientes(),
-      ]);
-      setIngrediente(ing);
-      setInsumos(ins);
-      setAllIngredientes(all);
+      const data = await listAllIngredientesAndInsumos();
+      setIngrediente(data.ingredientes.find((item) => item.id === params.id) ?? null);
+      setInsumos(data.insumos);
+      setAllIngredientes(data.ingredientes);
     } catch (err) {
       console.error(err);
       setError(true);

@@ -6,6 +6,7 @@ import {
   User,
 } from "firebase/auth";
 import { auth } from "./config";
+import { clearCurrentUserProfileCache } from "./users";
 
 export async function signIn(email: string, password: string): Promise<User> {
   const credential = await signInWithEmailAndPassword(auth, email, password);
@@ -22,6 +23,7 @@ export async function syncCurrentUserDisplayName(name: string): Promise<void> {
 
 export async function signOut(): Promise<void> {
   await firebaseSignOut(auth);
+  clearCurrentUserProfileCache();
 }
 
 export function subscribeToAuthChanges(

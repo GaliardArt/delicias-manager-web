@@ -153,6 +153,7 @@ export interface Order {
   payments: Payment[];
   orderDate: string;
   expectedDate: string;
+  salesDayId?: string;
   deliveryAddress?: string;
   notes?: string;
   status: OrderStatus;

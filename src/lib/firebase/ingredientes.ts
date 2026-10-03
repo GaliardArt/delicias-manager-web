@@ -25,7 +25,10 @@ import { resolveIngredienteUnitCost, toInsumosMap, toIngredientesMap } from "@/l
  * imediatamente em ingredientes que usam esse insumo, inclusive quando
  * existem ingredientes dentro de ingredientes.
  */
-async function loadIngredientesWithCurrentCost(activeOnly = false): Promise<Ingrediente[]> {
+async function loadIngredientesWithCurrentCost(): Promise<{
+  ingredientes: Ingrediente[];
+  insumos: Insumo[];
+}> {
   const [ingredientesSnap, insumosSnap] = await Promise.all([
     getDocs(query(collection(db, "ingredientes"), orderBy("name", "asc"))),
     getDocs(query(collection(db, "insumos"), orderBy("name", "asc"))),
@@ -50,19 +53,28 @@ async function loadIngredientesWithCurrentCost(activeOnly = false): Promise<Ingr
     ),
   }));
 
-  return activeOnly ? current.filter((ingrediente) => ingrediente.active) : current;
+  return { ingredientes: current, insumos };
 }
 
 export async function listActiveIngredientes(): Promise<Ingrediente[]> {
-  return loadIngredientesWithCurrentCost(true);
+  const { ingredientes } = await loadIngredientesWithCurrentCost();
+  return ingredientes.filter((ingrediente) => ingrediente.active);
 }
 
 export async function listAllIngredientes(): Promise<Ingrediente[]> {
-  return loadIngredientesWithCurrentCost(false);
+  const { ingredientes } = await loadIngredientesWithCurrentCost();
+  return ingredientes;
+}
+
+export async function listAllIngredientesAndInsumos(): Promise<{
+  ingredientes: Ingrediente[];
+  insumos: Insumo[];
+}> {
+  return loadIngredientesWithCurrentCost();
 }
 
 export async function getIngrediente(id: string): Promise<Ingrediente | null> {
-  const ingredientes = await loadIngredientesWithCurrentCost(false);
+  const { ingredientes } = await loadIngredientesWithCurrentCost();
   return ingredientes.find((ingrediente) => ingrediente.id === id) ?? null;
 }
 

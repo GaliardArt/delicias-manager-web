@@ -1,13 +1,17 @@
 import {
   collection,
+  DocumentData,
   doc,
   getDoc,
   getDocs,
   increment,
+  limit,
   orderBy,
+  QueryDocumentSnapshot,
   query,
   runTransaction,
   serverTimestamp,
+  startAfter,
   Timestamp,
   where,
   writeBatch,
@@ -129,84 +133,98 @@ export interface SaleListItem {
   itemsCount: number;
 }
 
+function localDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+async function getSalesForList(
+  max: number,
+  mode: "recent" | "historical"
+): Promise<QueryDocumentSnapshot<DocumentData>[]> {
+  if (max <= 0) return [];
+
+  const closedDaysSnap = await getDocs(
+    query(collection(db, "salesDays"), where("closed", "==", true))
+  );
+  const closedDayIds = new Set(closedDaysSnap.docs.map((d) => d.id));
+  const closedDates = new Set(
+    closedDaysSnap.docs.map((d) => d.data().date as string)
+  );
+  const batchSize = Math.min(Math.max(max, 25), 100);
+  const matches: QueryDocumentSnapshot<DocumentData>[] = [];
+  let cursor: QueryDocumentSnapshot<DocumentData> | undefined;
+
+  while (matches.length < max) {
+    const salesQuery = cursor
+      ? query(
+          collection(db, "sales"),
+          orderBy("createdAt", "desc"),
+          startAfter(cursor),
+          limit(batchSize)
+        )
+      : query(collection(db, "sales"), orderBy("createdAt", "desc"), limit(batchSize));
+    const snapshot = await getDocs(salesQuery);
+    if (snapshot.empty) break;
+
+    for (const saleDoc of snapshot.docs) {
+      const data = saleDoc.data();
+      const saleDate =
+        data.createdAt instanceof Timestamp ? localDateKey(data.createdAt.toDate()) : null;
+      const isClosed =
+        mode === "recent"
+          ? saleDate !== null && closedDates.has(saleDate)
+          : data.salesDayId
+            ? closedDayIds.has(String(data.salesDayId))
+            : saleDate !== null && closedDates.has(saleDate);
+
+      if ((mode === "recent" && !isClosed) || (mode === "historical" && isClosed)) {
+        matches.push(saleDoc);
+        if (matches.length >= max) break;
+      }
+    }
+
+    cursor = snapshot.docs[snapshot.docs.length - 1];
+    if (snapshot.size < batchSize) break;
+  }
+
+  return matches;
+}
+
 // Lista as vendas mais recentes. Filtros mais elaborados (período, forma de
 // pagamento) ficam para quando houver necessidade real de escalar (seção 28).
 export async function listRecentSales(max = 100): Promise<SaleListItem[]> {
-  const [salesSnap, closedDaysSnap] = await Promise.all([
-    getDocs(query(collection(db, "sales"), orderBy("createdAt", "desc"))),
-    getDocs(collection(db, "salesDays")),
-  ]);
-
-  const closedDates = new Set(
-    closedDaysSnap.docs
-      .filter((d) => d.data().closed === true)
-      .map((d) => d.data().date as string)
-  );
-  return salesSnap.docs
-    .filter((d) => {
-      const data = d.data();
-      const createdAt = data.createdAt instanceof Timestamp ? data.createdAt.toDate() : null;
-      if (!createdAt) return true;
-      const date = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, "0")}-${String(
-        createdAt.getDate()
-      ).padStart(2, "0")}`;
-      return !closedDates.has(date);
-    })
-    .slice(0, max)
-    .map((d) => {
-      const data = d.data();
-      return {
-        id: d.id,
-        customerName: data.customerName,
-        totalCents: data.totalCents,
-        paidCents: data.paidCents,
-        pendingCents: data.pendingCents,
-        createdAt: tsToIso(data.createdAt),
-        itemsCount: Array.isArray(data.items) ? data.items.length : 0,
-      };
-    });
+  const sales = await getSalesForList(max, "recent");
+  return sales.map((d) => {
+    const data = d.data();
+    return {
+      id: d.id,
+      customerName: data.customerName,
+      totalCents: data.totalCents,
+      paidCents: data.paidCents,
+      pendingCents: data.pendingCents,
+      createdAt: tsToIso(data.createdAt),
+      itemsCount: Array.isArray(data.items) ? data.items.length : 0,
+    };
+  });
 }
 
 export async function listHistoricalSales(max = 150): Promise<SaleListItem[]> {
-  const [salesSnap, closedDaysSnap] = await Promise.all([
-    getDocs(query(collection(db, "sales"), orderBy("createdAt", "desc"))),
-    getDocs(collection(db, "salesDays")),
-  ]);
-
-  const closedDayIds = new Set(
-    closedDaysSnap.docs
-      .filter((d) => d.data().closed === true)
-      .map((d) => d.id)
-  );
-  const closedDates = new Set(
-    closedDaysSnap.docs
-      .filter((d) => d.data().closed === true)
-      .map((d) => d.data().date as string)
-  );
-  return salesSnap.docs
-    .filter((d) => {
-      const data = d.data();
-      if (data.salesDayId) return closedDayIds.has(data.salesDayId);
-      const createdAt = data.createdAt instanceof Timestamp ? data.createdAt.toDate() : null;
-      if (!createdAt) return false;
-      const date = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, "0")}-${String(
-        createdAt.getDate()
-      ).padStart(2, "0")}`;
-      return closedDates.has(date);
-    })
-    .slice(0, max)
-    .map((d) => {
-      const data = d.data();
-      return {
-        id: d.id,
-        customerName: data.customerName,
-        totalCents: data.totalCents,
-        paidCents: data.paidCents,
-        pendingCents: data.pendingCents,
-        createdAt: tsToIso(data.createdAt),
-        itemsCount: Array.isArray(data.items) ? data.items.length : 0,
-      };
-    });
+  const sales = await getSalesForList(max, "historical");
+  return sales.map((d) => {
+    const data = d.data();
+    return {
+      id: d.id,
+      customerName: data.customerName,
+      totalCents: data.totalCents,
+      paidCents: data.paidCents,
+      pendingCents: data.pendingCents,
+      createdAt: tsToIso(data.createdAt),
+      itemsCount: Array.isArray(data.items) ? data.items.length : 0,
+    };
+  });
 }
 
 export async function getSaleWithPayments(saleId: string): Promise<Sale | null> {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   AlertCircle,
   BarChart3,
@@ -34,9 +34,8 @@ import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { listAllProducts } from "@/lib/firebase/products";
 import { listAllCustomers } from "@/lib/firebase/customers";
-import { listAllExpenses } from "@/lib/firebase/expenses";
-import { listAllInsumos } from "@/lib/firebase/insumos";
-import { listAllIngredientes } from "@/lib/firebase/ingredientes";
+import { listExpensesForDateRange } from "@/lib/firebase/expenses";
+import { listAllIngredientesAndInsumos } from "@/lib/firebase/ingredientes";
 import {
   AbcItem,
   buildAbc,
@@ -338,10 +337,11 @@ function downloadCsv(filename: string, headers: string[], rows: (string | number
 
 export default function RelatoriosPage() {
   const [sales, setSales] = useState<RawSale[] | null>(null);
-  const [orders, setOrders] = useState<RawOrder[]>([]);
+  const [orders, setOrders] = useState<RawOrder[] | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customers, setCustomers] = useState<Customer[] | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [expensesRangeKey, setExpensesRangeKey] = useState<string | null>(null);
   const [insumos, setInsumos] = useState<Insumo[]>([]);
   const [ingredientes, setIngredientes] = useState<Ingrediente[]>([]);
   const [error, setError] = useState(false);
@@ -351,29 +351,30 @@ export default function RelatoriosPage() {
   const [customEnd, setCustomEnd] = useState(todayLocalIso());
   const [copied, setCopied] = useState(false);
   const [abcMode, setAbcMode] = useState<"faturamento" | "lucro" | "quantidade">("faturamento");
+  const [reloadKey, setReloadKey] = useState(0);
+  const customerLoadInFlight = useRef(false);
+  const orderLoadInFlight = useRef(false);
 
   async function load() {
     setError(false);
     setSales(null);
+    setExpensesRangeKey(null);
+    setOrders(null);
+    setCustomers(null);
+    customerLoadInFlight.current = false;
+    orderLoadInFlight.current = false;
     try {
-      const [salesResult, ordersResult, productsResult, customersResult, expensesResult, insumosResult, ingredientesResult] =
+      const [salesResult, productsResult, ingredientData] =
         await Promise.all([
           getAllSalesRaw(),
-          getAllOrdersRaw(),
           listAllProducts(),
-          listAllCustomers(),
-          listAllExpenses(),
-          listAllInsumos(),
-          listAllIngredientes(),
+          listAllIngredientesAndInsumos(),
         ]);
 
       setSales(salesResult);
-      setOrders(ordersResult);
       setProducts(productsResult);
-      setCustomers(customersResult);
-      setExpenses(expensesResult);
-      setInsumos(insumosResult);
-      setIngredientes(ingredientesResult);
+      setInsumos(ingredientData.insumos);
+      setIngredientes(ingredientData.ingredientes);
     } catch (loadError) {
       console.error(loadError);
       setError(true);
@@ -393,6 +394,50 @@ export default function RelatoriosPage() {
   );
 
   const previousPeriod = useMemo(() => getPreviousPeriod(period), [period]);
+  const expenseStartDate = useMemo(() => {
+    const date = new Date(Math.min(period.start.getTime(), previousPeriod.start.getTime()));
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  }, [period, previousPeriod]);
+  const expenseEndDate = useMemo(() => {
+    const date = period.end;
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  }, [period]);
+  const currentExpensesRangeKey = `${expenseStartDate}:${expenseEndDate}`;
+
+  useEffect(() => {
+    let active = true;
+    setExpensesRangeKey(null);
+    listExpensesForDateRange(expenseStartDate, expenseEndDate)
+      .then((result) => {
+        if (!active) return;
+        setExpenses(result);
+        setExpensesRangeKey(currentExpensesRangeKey);
+      })
+      .catch((loadError) => {
+        if (!active) return;
+        console.error(loadError);
+        setError(true);
+      });
+    return () => { active = false; };
+  }, [expenseStartDate, expenseEndDate, currentExpensesRangeKey, reloadKey]);
+
+  useEffect(() => {
+    if (tab !== "clientes" || customers !== null || customerLoadInFlight.current) return;
+    customerLoadInFlight.current = true;
+    listAllCustomers()
+      .then(setCustomers)
+      .catch((loadError) => { console.error(loadError); setError(true); })
+      .finally(() => { customerLoadInFlight.current = false; });
+  }, [tab, customers, reloadKey]);
+
+  useEffect(() => {
+    if (tab !== "estoque" || orders !== null || orderLoadInFlight.current) return;
+    orderLoadInFlight.current = true;
+    getAllOrdersRaw()
+      .then(setOrders)
+      .catch((loadError) => { console.error(loadError); setError(true); })
+      .finally(() => { orderLoadInFlight.current = false; });
+  }, [tab, orders, reloadKey]);
   const current = useMemo(() => (sales ? filterByPeriod(sales, period) : []), [sales, period]);
   const previous = useMemo(() => (sales ? filterByPeriod(sales, previousPeriod) : []), [sales, previousPeriod]);
 
@@ -468,7 +513,7 @@ export default function RelatoriosPage() {
   );
 
   const customerMetrics = useMemo(
-    () => (sales ? buildCustomerMetrics(current, sales, customers) : []),
+    () => (sales ? buildCustomerMetrics(current, sales, customers ?? []) : []),
     [current, sales, customers]
   );
 
@@ -499,7 +544,7 @@ export default function RelatoriosPage() {
       if (!currentDate || sale.createdAt > currentDate) lastByCustomer.set(sale.customerId, sale.createdAt);
     }
 
-    return customers
+    return (customers ?? [])
       .filter((customer) => customer.active)
       .map((customer) => ({
         ...customer,
@@ -560,7 +605,7 @@ export default function RelatoriosPage() {
     [current, products, insumos, ingredientes]
   );
 
-  const production = useMemo(() => buildProductionSummary(orders, products), [orders, products]);
+  const production = useMemo(() => buildProductionSummary(orders ?? [], products), [orders, products]);
   const abc = useMemo(() => buildAbc(productPerformance, abcMode), [productPerformance, abcMode]);
 
   const expenseCategories = useMemo(
@@ -742,7 +787,11 @@ export default function RelatoriosPage() {
     );
   }
 
-  if (sales === null && !error) {
+  if (
+    (sales === null || expensesRangeKey !== currentExpensesRangeKey ||
+      (tab === "clientes" && customers === null) || (tab === "estoque" && orders === null)) &&
+    !error
+  ) {
     return (
       <AppShell title="Relatórios">
         <div className="flex flex-col gap-3">
@@ -762,7 +811,7 @@ export default function RelatoriosPage() {
           title="Não foi possível carregar os relatórios"
           description="Verifique sua conexão ou as credenciais do Firebase."
           actionLabel="Tentar novamente"
-          onAction={load}
+          onAction={() => { setReloadKey((value) => value + 1); load(); }}
         />
       </AppShell>
     );

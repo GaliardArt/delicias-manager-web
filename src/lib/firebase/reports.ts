@@ -1,4 +1,13 @@
-import { collection, getDocs, Timestamp } from "firebase/firestore";
+import {
+  collection,
+  DocumentData,
+  getDocs,
+  query,
+  Query,
+  QuerySnapshot,
+  Timestamp,
+  where,
+} from "firebase/firestore";
 import { db } from "./config";
 import { Customer, Ingrediente, Insumo, Product, OrderStatus } from "@/types";
 import { normalizeOrderStatus } from "@/lib/utils/order-status";
@@ -49,9 +58,7 @@ export interface RawOrder {
   }[];
 }
 
-// Uma única leitura da coleção `sales` — tudo o mais é calculado em memória.
-export async function getAllSalesRaw(): Promise<RawSale[]> {
-  const snapshot = await getDocs(collection(db, "sales"));
+function mapSalesSnapshot(snapshot: QuerySnapshot<DocumentData>): RawSale[] {
   return snapshot.docs.map((d) => {
     const data = d.data();
     const createdAt =
@@ -83,6 +90,36 @@ export async function getAllSalesRaw(): Promise<RawSale[]> {
       })),
     };
   });
+}
+
+// Uma única leitura da coleção `sales` — tudo o mais é calculado em memória.
+// Quando a tela precisa de um dia, a consulta fica restrita ao intervalo local.
+export async function getAllSalesRaw(date?: string): Promise<RawSale[]> {
+  const salesCollection = collection(db, "sales");
+  let salesQuery: Query<DocumentData> = salesCollection;
+  if (date) {
+    const start = new Date(`${date}T00:00:00`);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    salesQuery = query(
+      salesCollection,
+      where("createdAt", ">=", Timestamp.fromDate(start)),
+      where("createdAt", "<", Timestamp.fromDate(end))
+    );
+  }
+  const snapshot = await getDocs(salesQuery);
+  return mapSalesSnapshot(snapshot);
+}
+
+export async function getSalesFromDateRaw(date: string): Promise<RawSale[]> {
+  const start = new Date(`${date}T00:00:00`);
+  const snapshot = await getDocs(
+    query(
+      collection(db, "sales"),
+      where("createdAt", ">=", Timestamp.fromDate(start))
+    )
+  );
+  return mapSalesSnapshot(snapshot);
 }
 
 export async function getAllOrdersRaw(): Promise<RawOrder[]> {
@@ -231,29 +268,35 @@ export interface SalesSummary {
 }
 
 export function summarizeSales(sales: RawSale[]): SalesSummary {
-  const subtotalCents = sales.reduce((sum, sale) => sum + sale.subtotalCents, 0);
-  const discountCents = sales.reduce((sum, sale) => sum + sale.discountCents, 0);
-  const faturamentoBrutoCents = subtotalCents;
-  const faturamentoLiquidoCents = sales.reduce((sum, sale) => sum + sale.totalCents, 0);
-  const faturamentoCents = faturamentoLiquidoCents;
-  const recebidoCents = sales.reduce((sum, sale) => sum + sale.paidCents, 0);
-  const pendenteCents = sales.reduce((sum, sale) => sum + sale.pendingCents, 0);
   const quantidadeVendas = sales.length;
-  const quantidadeItens = sales.reduce(
-    (sum, sale) => sum + sale.items.reduce((itemSum, item) => itemSum + item.quantity, 0),
-    0
-  );
+  let subtotalCents = 0;
+  let discountCents = 0;
+  let faturamentoLiquidoCents = 0;
+  let recebidoCents = 0;
+  let pendenteCents = 0;
+  let quantidadeItens = 0;
+  let custoCents = 0;
+
+  for (const sale of sales) {
+    subtotalCents += sale.subtotalCents;
+    discountCents += sale.discountCents;
+    faturamentoLiquidoCents += sale.totalCents;
+    recebidoCents += sale.paidCents;
+    pendenteCents += sale.pendingCents;
+    let saleQuantityItems = 0;
+    let saleCostCents = 0;
+    for (const item of sale.items) {
+      saleQuantityItems += item.quantity;
+      saleCostCents += Math.round(item.unitCostCents * item.quantity);
+    }
+    quantidadeItens += saleQuantityItems;
+    custoCents += saleCostCents;
+  }
+
+  const faturamentoBrutoCents = subtotalCents;
+  const faturamentoCents = faturamentoLiquidoCents;
   const ticketMedioCents =
     quantidadeVendas > 0 ? Math.round(faturamentoLiquidoCents / quantidadeVendas) : 0;
-  const custoCents = sales.reduce(
-    (sum, sale) =>
-      sum +
-      sale.items.reduce(
-        (itemSum, item) => itemSum + Math.round(item.unitCostCents * item.quantity),
-        0
-      ),
-    0
-  );
   const lucroBrutoCents = faturamentoLiquidoCents - custoCents;
 
   return {
@@ -565,15 +608,22 @@ export interface DailyMetric {
 
 export function buildDailyMetrics(sales: RawSale[], period: Period): DailyMetric[] {
   const days: DailyMetric[] = [];
+  const salesByLocalDay = new Map<string, RawSale[]>();
+  for (const sale of sales) {
+    const date = sale.createdAt;
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    const bucket = salesByLocalDay.get(key) ?? [];
+    bucket.push(sale);
+    salesByLocalDay.set(key, bucket);
+  }
   const cursor = new Date(period.start);
   const maxDays = Math.min(120, Math.max(1, Math.ceil((period.end.getTime() - period.start.getTime()) / 86400000)));
 
   for (let i = 0; i < maxDays; i += 1) {
     const start = new Date(cursor);
-    const end = new Date(cursor);
-    end.setDate(end.getDate() + 1);
 
-    const inDay = sales.filter((sale) => sale.createdAt >= start && sale.createdAt < end);
+    const localKey = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
+    const inDay = salesByLocalDay.get(localKey) ?? [];
     const summary = summarizeSales(inDay);
 
     days.push({
@@ -635,11 +685,19 @@ export interface MonthlyEvolution {
 export function computeMonthlyEvolution(allSales: RawSale[], monthsBack = 6): MonthlyEvolution[] {
   const months: MonthlyEvolution[] = [];
   const now = new Date();
+  const salesByMonth = new Map<string, RawSale[]>();
+  for (const sale of allSales) {
+    const date = sale.createdAt;
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    const bucket = salesByMonth.get(key) ?? [];
+    bucket.push(sale);
+    salesByMonth.set(key, bucket);
+  }
 
   for (let i = monthsBack - 1; i >= 0; i -= 1) {
     const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
-    const inMonth = allSales.filter((sale) => sale.createdAt >= monthStart && sale.createdAt < monthEnd);
+    const monthKey = `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, "0")}`;
+    const inMonth = salesByMonth.get(monthKey) ?? [];
     const summary = summarizeSales(inMonth);
 
     months.push({

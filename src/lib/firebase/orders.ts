@@ -4,6 +4,7 @@ import {
   getDoc,
   getDocs,
   increment,
+  limit,
   orderBy,
   query,
   runTransaction,
@@ -66,7 +67,7 @@ export async function createOrder(input: CreateOrderInput): Promise<string> {
     throw new Error("O valor pago não pode ser maior que o total da encomenda.");
   }
 
-  await ensureOpenSalesDay(expectedDate);
+  const salesDayId = await ensureOpenSalesDay(expectedDate);
 
   const batch = writeBatch(db);
   const orderRef = doc(collection(db, "orders"));
@@ -82,6 +83,7 @@ export async function createOrder(input: CreateOrderInput): Promise<string> {
     pendingCents,
     orderDate,
     expectedDate,
+    salesDayId,
     deliveryAddress: deliveryAddress ?? "",
     notes: notes ?? "",
     status: "em_producao",
@@ -140,7 +142,11 @@ export function isOrderCompleted(order: Pick<OrderListItem, "status">): boolean 
 }
 
 export async function listRecentOrders(max = 150): Promise<OrderListItem[]> {
-  const q = query(collection(db, "orders"), orderBy("expectedDate", "asc"));
+  const q = query(
+    collection(db, "orders"),
+    orderBy("expectedDate", "asc"),
+    limit(max)
+  );
   const snapshot = await getDocs(q);
   return snapshot.docs.slice(0, max).map((d) => {
     const data = d.data();
@@ -187,6 +193,7 @@ export async function getOrderWithPayments(orderId: string): Promise<Order | nul
     pendingCents: data.pendingCents,
     orderDate: data.orderDate,
     expectedDate: data.expectedDate,
+    salesDayId: data.salesDayId,
     deliveryAddress: data.deliveryAddress,
     notes: data.notes,
     status: normalizeOrderStatus(data.status),
@@ -205,6 +212,7 @@ export async function addOrderPayment(
     throw new Error("O valor do pagamento precisa ser maior que zero.");
   }
 
+  let salesDayId: string | undefined;
   let expectedDate: string | undefined;
 
   await runTransaction(db, async (transaction) => {
@@ -214,7 +222,8 @@ export async function addOrderPayment(
       throw new Error("Encomenda não encontrada.");
     }
     const order = orderSnap.data();
-    expectedDate = order.expectedDate as string | undefined;
+    salesDayId = typeof order.salesDayId === "string" ? order.salesDayId : undefined;
+    expectedDate = typeof order.expectedDate === "string" ? order.expectedDate : undefined;
     const currentPaid: number = order.paidCents;
     const total: number = order.totalCents;
     const newPaid = currentPaid + amountCents;
@@ -248,7 +257,12 @@ export async function addOrderPayment(
     });
   });
 
-  if (expectedDate) {
+  if (salesDayId) {
+    await updateDoc(doc(db, "salesDays", salesDayId), {
+      receivedCents: increment(amountCents),
+      pendingCents: increment(-amountCents),
+    });
+  } else if (expectedDate) {
     const daysSnap = await getDocs(
       query(collection(db, "salesDays"), where("date", "==", expectedDate))
     );
@@ -277,12 +291,17 @@ export async function deleteOrder(orderId: string): Promise<void> {
     batch.delete(payment.ref);
   }
 
-  const daysSnap = await getDocs(
-    query(collection(db, "salesDays"), where("date", "==", order.expectedDate))
-  );
-  const dayDoc = daysSnap.docs[0];
-  if (dayDoc && order.status !== "cancelada") {
-    const dayRef = dayDoc.ref;
+  let dayRef =
+    typeof order.salesDayId === "string"
+      ? doc(db, "salesDays", order.salesDayId)
+      : null;
+  if (!dayRef) {
+    const daysSnap = await getDocs(
+      query(collection(db, "salesDays"), where("date", "==", order.expectedDate))
+    );
+    dayRef = daysSnap.docs[0]?.ref ?? null;
+  }
+  if (dayRef && order.status !== "cancelada") {
     batch.update(dayRef, {
       expectedCents: increment(-Number(order.totalCents ?? 0)),
       receivedCents: increment(-Number(order.paidCents ?? 0)),

@@ -14,7 +14,7 @@ import {
 } from "firebase/firestore";
 import { db } from "./config";
 import { Order } from "@/types";
-import { getAllSalesRaw, RawSale, summarizeSales, SalesSummary } from "./reports";
+import { getAllSalesRaw, getSalesFromDateRaw, RawSale, summarizeSales, SalesSummary } from "./reports";
 import { normalizeSaleItems } from "@/lib/utils/normalize-items";
 import { normalizeOrderStatus } from "@/lib/utils/order-status";
 import { todayLocalIso } from "@/lib/utils/format";
@@ -73,6 +73,7 @@ function mapOrderDoc(id: string, data: DocumentData): Order {
     payments: [],
     orderDate: data.orderDate,
     expectedDate: data.expectedDate,
+    salesDayId: data.salesDayId,
     deliveryAddress: data.deliveryAddress,
     notes: data.notes,
     status: normalizeOrderStatus(data.status),
@@ -184,11 +185,18 @@ export async function ensureOpenSalesDay(date: string): Promise<string> {
 // ou venda e seus dados operacionais continuam sendo calculados ao vivo aqui.
 // Agrupa por data tanto as encomendas (por data prevista de entrega) quanto as
 // vendas do dia (por data da venda). Datas já encerradas ficam fora da lista aberta.
-export async function getOpenDayGroups(): Promise<OpenDayGroup[]> {
+export async function getOpenDayGroups(fromDate?: string): Promise<OpenDayGroup[]> {
+  const salesDaysQuery = query(
+    collection(db, "salesDays"),
+    where("closed", "==", true)
+  );
+  const ordersQuery = fromDate
+    ? query(collection(db, "orders"), where("expectedDate", ">=", fromDate))
+    : collection(db, "orders");
   const [closedDaysSnap, ordersSnap, allSales] = await Promise.all([
-    getDocs(collection(db, "salesDays")),
-    getDocs(collection(db, "orders")),
-    getAllSalesRaw(),
+    getDocs(salesDaysQuery),
+    getDocs(ordersQuery),
+    fromDate ? getSalesFromDateRaw(fromDate) : getAllSalesRaw(),
   ]);
 
   // Só um Dia de Venda explicitamente encerrado bloqueia a data.
@@ -205,6 +213,7 @@ export async function getOpenDayGroups(): Promise<OpenDayGroup[]> {
   for (const d of ordersSnap.docs) {
     const data = d.data();
     if (data.status === "cancelada") continue;
+    if (fromDate && data.expectedDate < fromDate) continue;
     if (closedDates.has(data.expectedDate)) continue;
     const order = mapOrderDoc(d.id, data);
     if (!orderGroups.has(order.expectedDate)) orderGroups.set(order.expectedDate, []);
@@ -213,6 +222,7 @@ export async function getOpenDayGroups(): Promise<OpenDayGroup[]> {
 
   for (const sale of allSales) {
     const key = dateKey(sale.createdAt);
+    if (fromDate && key < fromDate) continue;
     if (closedDates.has(key)) continue;
     if (!salesGroups.has(key)) salesGroups.set(key, []);
     salesGroups.get(key)!.push(sale);
@@ -249,8 +259,7 @@ export async function getActiveOrdersForDate(date: string): Promise<Order[]> {
 // fechamento para somar ao valor do dia (seção pedida: "vendas avulsas do dia
 // entram no valor do Dia de Venda").
 export async function getSalesForDate(date: string): Promise<RawSale[]> {
-  const allSales = await getAllSalesRaw();
-  return allSales.filter((s) => dateKey(s.createdAt) === date);
+  return getAllSalesRaw(date);
 }
 
 // Fecha o dia: grava o instantâneo dos totais, combinando encomendas + vendas
@@ -329,7 +338,7 @@ export async function closeDay(
     for (const sale of sales.slice(i, i + 450)) {
       salesBatch.update(doc(db, "sales", sale.id), { salesDayId: dayRef.id });
     }
-    if (i < sales.length) await salesBatch.commit();
+    await salesBatch.commit();
   }
 
   return dayRef.id;

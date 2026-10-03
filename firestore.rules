@@ -28,7 +28,7 @@ service cloud.firestore {
     }
 
     match /userProfiles/{userId} {
-      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
+      allow read: if (isSignedIn() && request.auth.uid == userId) || isAdmin();
 
       allow create: if isAdmin()
         || (
@@ -60,18 +60,18 @@ service cloud.firestore {
         );
 
       allow update: if (
-          isAdmin()
-          && (
-            resource.data.email.lower() != "adm@adm.com"
-            || (request.resource.data.role == "admin" && request.resource.data.active == true)
-          )
-        )
-        || (
           isSignedIn()
           && request.auth.uid == userId
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             "name", "cargo", "photoUrl", "updatedAt"
           ])
+        )
+        || (
+          isAdmin()
+          && (
+            resource.data.email.lower() != "adm@adm.com"
+            || (request.resource.data.role == "admin" && request.resource.data.active == true)
+          )
         );
 
       allow delete: if isAdmin()
@@ -84,11 +84,17 @@ service cloud.firestore {
           isSignedIn()
           && resource.data.email.lower() == request.auth.token.email.lower()
         );
-      allow create, update, delete: if isAdmin();
-      allow delete: if isSignedIn()
-        && resource.data.email.lower() == request.auth.token.email.lower();
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin()
+        || (
+          isSignedIn()
+          && resource.data.email.lower() == request.auth.token.email.lower()
+        );
     }
 
+    // O app é privado e todos os usuários com login são operadores confiáveis.
+    // A permissão de entrar é exigida no Firestore sem consultar o perfil em
+    // cada leitura/escrita, evitando leituras faturáveis das Security Rules.
     match /customers/{customerId} {
       allow read, write: if isSignedIn();
     }

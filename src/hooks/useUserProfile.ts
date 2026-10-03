@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "./useAuth";
 import {
   BOOTSTRAP_ADMIN_EMAIL,
-  ensureCurrentUserProfile,
+  getCurrentUserProfileCached,
   getUserProfile,
   UserProfile,
 } from "@/lib/firebase/users";
@@ -75,7 +75,7 @@ export function useUserProfile() {
       setLoading(!cachedProfile);
 
       try {
-        const result = await ensureCurrentUserProfile();
+        const result = await getCurrentUserProfileCached();
         if (!cancelled) {
           setProfile(result);
           if (result) writeCachedProfile(result);

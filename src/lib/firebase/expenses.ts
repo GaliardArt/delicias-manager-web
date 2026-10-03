@@ -1,14 +1,17 @@
 import {
   addDoc,
   collection,
+  DocumentData,
   deleteDoc,
   doc,
   getDocs,
   orderBy,
   query,
+  QuerySnapshot,
   serverTimestamp,
   Timestamp,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import { db } from "./config";
 import { Expense, ExpenseKind, ExpenseRecurrence, ExpenseStatus } from "@/types";
@@ -95,13 +98,7 @@ function normalizeExpenseRecurrence(value: unknown): ExpenseRecurrence {
   return "nenhuma";
 }
 
-// Lista todas as contas — o filtro por período é feito no cliente (mesmo
-// padrão de src/lib/firebase/reports.ts), já que o volume de uma confeitaria
-// pequena não justifica consultas por período no Firestore.
-export async function listAllExpenses(): Promise<Expense[]> {
-  const q = query(collection(db, "expenses"), orderBy("date", "desc"));
-  const snapshot = await getDocs(q);
-
+function mapExpenses(snapshot: QuerySnapshot<DocumentData>): Expense[] {
   return snapshot.docs.map((d) => {
     const data = d.data();
     const status = normalizeExpenseStatus(data.status);
@@ -126,6 +123,23 @@ export async function listAllExpenses(): Promise<Expense[]> {
       createdAt: tsToIso(data.createdAt),
     };
   });
+}
+
+export async function listExpensesForDateRange(startDate: string, endDate: string): Promise<Expense[]> {
+  const q = query(
+    collection(db, "expenses"),
+    where("date", ">=", startDate),
+    where("date", "<", endDate),
+    orderBy("date", "desc")
+  );
+  const snapshot = await getDocs(q);
+  return mapExpenses(snapshot);
+}
+
+// Mantida para telas que precisam consultar o histórico completo.
+export async function listAllExpenses(): Promise<Expense[]> {
+  const snapshot = await getDocs(query(collection(db, "expenses"), orderBy("date", "desc")));
+  return mapExpenses(snapshot);
 }
 
 export function isExpenseOverdue(expense: Expense, today: string): boolean {

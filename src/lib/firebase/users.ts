@@ -44,6 +44,14 @@ export interface PendingUserAccess {
   updatedAt?: string;
 }
 
+const CURRENT_PROFILE_CACHE_MS = 60_000;
+const currentProfileCache = new Map<
+  string,
+  { profile: UserProfile | null; expiresAt: number }
+>();
+const currentProfileRequests = new Map<string, Promise<UserProfile | null>>();
+const currentProfileCacheVersions = new Map<string, number>();
+
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
@@ -88,6 +96,56 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
   const snap = await getDoc(doc(db, "userProfiles", uid));
   if (!snap.exists()) return null;
   return mapProfile(snap.id, snap.data());
+}
+
+// Compartilha a consulta de perfil entre componentes da mesma sessão e evita
+// reler o mesmo documento a cada troca de rota durante um minuto.
+export async function getCurrentUserProfileCached(): Promise<UserProfile | null> {
+  const user = auth.currentUser;
+  if (!user) return null;
+
+  const cached = currentProfileCache.get(user.uid);
+  if (cached && cached.expiresAt > Date.now()) return cached.profile;
+
+  const inFlight = currentProfileRequests.get(user.uid);
+  if (inFlight) return inFlight;
+
+  const version = currentProfileCacheVersions.get(user.uid) ?? 0;
+  let request: Promise<UserProfile | null>;
+  request = ensureCurrentUserProfile()
+    .then((profile) => {
+      if (
+        auth.currentUser?.uid === user.uid &&
+        (currentProfileCacheVersions.get(user.uid) ?? 0) === version
+      ) {
+        currentProfileCache.set(user.uid, {
+          profile,
+          expiresAt: Date.now() + CURRENT_PROFILE_CACHE_MS,
+        });
+      }
+      return profile;
+    })
+    .finally(() => {
+      if (currentProfileRequests.get(user.uid) === request) {
+        currentProfileRequests.delete(user.uid);
+      }
+    });
+
+  currentProfileRequests.set(user.uid, request);
+  return request;
+}
+
+export function invalidateUserProfileCache(uid: string): void {
+  currentProfileCacheVersions.set(uid, (currentProfileCacheVersions.get(uid) ?? 0) + 1);
+  currentProfileCache.delete(uid);
+  currentProfileRequests.delete(uid);
+}
+
+export function clearCurrentUserProfileCache(): void {
+  const uids = new Set([...currentProfileCache.keys(), ...currentProfileRequests.keys()]);
+  for (const uid of uids) invalidateUserProfileCache(uid);
+  currentProfileCache.clear();
+  currentProfileRequests.clear();
 }
 
 export async function ensureCurrentUserProfile(): Promise<UserProfile | null> {
@@ -224,6 +282,21 @@ export async function listPendingUserAccess(): Promise<PendingUserAccess[]> {
   return snapshot.docs.map((d) => mapPendingAccess(d.id, d.data()));
 }
 
+export async function listAdminUserAccess(): Promise<{
+  profiles: UserProfile[];
+  pending: PendingUserAccess[];
+}> {
+  await assertCurrentAdmin();
+  const [profilesSnap, pendingSnap] = await Promise.all([
+    getDocs(query(collection(db, "userProfiles"), orderBy("email", "asc"))),
+    getDocs(query(collection(db, "pendingUserAccess"), orderBy("email", "asc"))),
+  ]);
+  return {
+    profiles: profilesSnap.docs.map((d) => mapProfile(d.id, d.data())),
+    pending: pendingSnap.docs.map((d) => mapPendingAccess(d.id, d.data())),
+  };
+}
+
 async function findProfileByEmail(email: string): Promise<UserProfile | null> {
   const snapshot = await getDocs(collection(db, "userProfiles"));
   const normalized = normalizeEmail(email);
@@ -252,7 +325,7 @@ export async function saveUserAccessConfiguration(input: {
 
   const existing = await findProfileByEmail(email);
   if (existing) {
-    await updateUserProfile(existing.uid, {
+    await writeUserProfileUpdate(existing, {
       name: input.name.trim(),
       cargo: input.cargo.trim(),
       role,
@@ -291,6 +364,16 @@ export async function updateUserProfile(
   const target = await getUserProfile(uid);
   if (!target) throw new Error("Perfil não encontrado.");
 
+  await writeUserProfileUpdate(target, input);
+}
+
+async function writeUserProfileUpdate(
+  target: UserProfile,
+  input: Pick<UserProfile, "name" | "cargo" | "role" | "active"> & {
+    permissions: PermissionMap;
+  }
+): Promise<void> {
+  const uid = target.uid;
   const isBootstrap = normalizeEmail(target.email) === BOOTSTRAP_ADMIN_EMAIL;
   if (uid === auth.currentUser?.uid && input.active === false) {
     throw new Error("Você não pode desativar o próprio acesso.");
@@ -311,6 +394,7 @@ export async function updateUserProfile(
         : input.permissions,
     updatedAt: serverTimestamp(),
   });
+  invalidateUserProfileCache(uid);
 }
 
 export async function updateOwnProfile(input: {
@@ -327,6 +411,7 @@ export async function updateOwnProfile(input: {
     ...(input.photoUrl !== undefined ? { photoUrl: input.photoUrl } : {}),
     updatedAt: serverTimestamp(),
   });
+  invalidateUserProfileCache(user.uid);
 }
 
 async function imageFileToDataUrl(file: File): Promise<string> {

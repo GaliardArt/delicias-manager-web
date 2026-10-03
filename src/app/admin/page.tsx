@@ -20,7 +20,6 @@ import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useUserProfile } from "@/hooks/useUserProfile";
-import { assertCurrentAdmin } from "@/lib/firebase/users";
 import {
   clearExpenses,
   clearGeneralHistories,
@@ -33,8 +32,7 @@ import {
 import {
   BOOTSTRAP_ADMIN_EMAIL,
   deletePendingUserAccess,
-  listPendingUserAccess,
-  listUserProfiles,
+  listAdminUserAccess,
   removeUserProfile,
   saveUserAccessConfiguration,
   updateUserProfile,
@@ -130,19 +128,18 @@ export default function AdminPage() {
     []
   );
 
-  async function loadUsers() {
+  async function loadUsers(): Promise<boolean> {
     setLoadingUsers(true);
     try {
-      const [profiles, pending] = await Promise.all([
-        listUserProfiles(),
-        listPendingUserAccess(),
-      ]);
-      setUsers(profiles);
-      setPendingUsers(pending);
+      const access = await listAdminUserAccess();
+      setUsers(access.profiles);
+      setPendingUsers(access.pending);
       setMessage(null);
+      return true;
     } catch (err) {
       console.error(err);
       setMessage(err instanceof Error ? err.message : "Não foi possível carregar os acessos.");
+      return false;
     } finally {
       setLoadingUsers(false);
     }
@@ -152,15 +149,8 @@ export default function AdminPage() {
     let cancelled = false;
     async function verifyAccess() {
       if (loading) return;
-      try {
-        const adminProfile = await assertCurrentAdmin();
-        if (!cancelled && adminProfile.role === "admin") {
-          await loadUsers();
-        }
-      } catch (error) {
-        console.error(error);
-        if (!cancelled) router.replace("/dashboard");
-      }
+      const loaded = await loadUsers();
+      if (!loaded && !cancelled) router.replace("/dashboard");
     }
     verifyAccess();
     return () => { cancelled = true; };
