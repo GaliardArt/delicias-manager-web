@@ -15,16 +15,24 @@ import { listActiveCustomers } from "@/lib/firebase/customers";
 import { listActiveProducts } from "@/lib/firebase/products";
 import { listActiveInsumos } from "@/lib/firebase/insumos";
 import { listActiveIngredientes } from "@/lib/firebase/ingredientes";
-import { createSale } from "@/lib/firebase/sales";
+import { createSale, updateSale } from "@/lib/firebase/sales";
 import { getProductExtraCost, resolveProductCost, toInsumosMap, toIngredientesMap } from "@/lib/costing";
 import { formatCurrencyBRL } from "@/lib/utils/format";
 import { paymentMethodOptions } from "@/lib/utils/payment-method";
 import { Users } from "lucide-react";
+import { Sale } from "@/types";
 
 type DiscountMode = "valor" | "percentual";
 
-export function SaleForm() {
+interface SaleFormProps {
+  initialSale?: Sale;
+  onSaved?: (sale: Sale) => void;
+  onCancel?: () => void;
+}
+
+export function SaleForm({ initialSale, onSaved, onCancel }: SaleFormProps) {
   const router = useRouter();
+  const isEditing = Boolean(initialSale);
 
   const [customers, setCustomers] = useState<Customer[] | null>(null);
   const [products, setProducts] = useState<Product[] | null>(null);
@@ -32,17 +40,17 @@ export function SaleForm() {
   const [ingredientes, setIngredientes] = useState<Ingrediente[]>([]);
   const [loadError, setLoadError] = useState(false);
 
-  const [customerId, setCustomerId] = useState("");
-  const [avulso, setAvulso] = useState(false);
-  const [avulsoName, setAvulsoName] = useState("");
-  const [items, setItems] = useState<SaleItem[]>([]);
+  const [customerId, setCustomerId] = useState(initialSale?.customerId ?? "");
+  const [avulso, setAvulso] = useState(Boolean(initialSale && !initialSale.customerId));
+  const [avulsoName, setAvulsoName] = useState(initialSale?.customerName ?? "");
+  const [items, setItems] = useState<SaleItem[]>(initialSale?.items ?? []);
 
   const [pendingProductId, setPendingProductId] = useState("");
   const [pendingQuantity, setPendingQuantity] = useState(1);
   const [pendingPriceCents, setPendingPriceCents] = useState(0);
 
   const [discountMode, setDiscountMode] = useState<DiscountMode>("valor");
-  const [discountValueCents, setDiscountValueCents] = useState(0);
+  const [discountValueCents, setDiscountValueCents] = useState(initialSale?.discountCents ?? 0);
   const [discountPercent, setDiscountPercent] = useState(0);
 
   const [method, setMethod] = useState<PaymentMethod>("dinheiro");
@@ -80,6 +88,7 @@ export function SaleForm() {
   const totalCents = Math.max(0, subtotalCents - discountCents);
 
   useEffect(() => {
+    if (isEditing) return;
     if (method === "fiado") {
       setPaidCents(0);
     } else if (!paidTouched) {
@@ -87,7 +96,7 @@ export function SaleForm() {
     } else {
       setPaidCents((current) => Math.min(current, totalCents));
     }
-  }, [totalCents, method, paidTouched]);
+  }, [totalCents, method, paidTouched, isEditing]);
 
   function handleSelectProduct(productId: string) {
     setPendingProductId(productId);
@@ -125,8 +134,12 @@ export function SaleForm() {
     setItems((prev) => prev.filter((_, i) => i !== index));
   }
 
-  const pendingCents = totalCents - paidCents;
-  const selectedCustomer = customers?.find((c) => c.id === customerId);
+  const effectivePaidCents = initialSale?.paidCents ?? paidCents;
+  const pendingCents = totalCents - effectivePaidCents;
+  const selectedCustomer = customers?.find((c) => c.id === customerId) ??
+    (initialSale && customerId === initialSale.customerId
+      ? ({ id: initialSale.customerId, name: initialSale.customerName } as Customer)
+      : undefined);
   const effectiveCustomerName = avulso ? avulsoName.trim() || "Cliente avulso" : selectedCustomer?.name;
 
   async function handleSubmit() {
@@ -144,22 +157,33 @@ export function SaleForm() {
       setFormError("O desconto não pode ser maior que o subtotal.");
       return;
     }
-    if (paidCents > totalCents) {
+    if (!isEditing && paidCents > totalCents) {
       setFormError("O valor pago não pode ser maior que o total.");
       return;
     }
 
     setSubmitting(true);
     try {
-      const saleId = await createSale({
-        customerId: avulso ? "" : selectedCustomer!.id,
-        customerName: effectiveCustomerName!,
-        items,
-        discountCents,
-        initialPaymentCents: paidCents,
-        initialPaymentMethod: method,
-      });
-      router.push(`/vendas/${saleId}`);
+      if (initialSale) {
+        const saved = await updateSale(initialSale.id, {
+          customerId: avulso ? "" : selectedCustomer!.id,
+          customerName: effectiveCustomerName!,
+          items,
+          discountCents,
+          payments: initialSale.payments,
+        });
+        onSaved?.(saved);
+      } else {
+        const saleId = await createSale({
+          customerId: avulso ? "" : selectedCustomer!.id,
+          customerName: effectiveCustomerName!,
+          items,
+          discountCents,
+          initialPaymentCents: paidCents,
+          initialPaymentMethod: method,
+        });
+        router.push(`/vendas/${saleId}`);
+      }
     } catch (err) {
       console.error(err);
       setFormError(
@@ -192,7 +216,7 @@ export function SaleForm() {
     );
   }
 
-  if (products.length === 0) {
+  if (products.length === 0 && !isEditing) {
     return (
       <EmptyState
         icon={Users}
@@ -227,6 +251,9 @@ export function SaleForm() {
           ) : (
             <Select value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
               <option value="">Selecione um cliente</option>
+              {initialSale?.customerId && !customers.some((c) => c.id === initialSale.customerId) && (
+                <option value={initialSale.customerId}>{initialSale.customerName} (inativo)</option>
+              )}
               {customers.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -368,7 +395,7 @@ export function SaleForm() {
         </div>
       </Card>
 
-      <Card>
+      {!isEditing ? <Card>
         <CardHeader>
           <CardTitle>Pagamento</CardTitle>
         </CardHeader>
@@ -413,7 +440,10 @@ export function SaleForm() {
             </span>
           </div>
         </div>
-      </Card>
+      </Card> : <Card>
+        <CardHeader><CardTitle>Pagamentos existentes</CardTitle></CardHeader>
+        <p className="text-sm text-ink-muted">Os pagamentos registrados ({formatCurrencyBRL(effectivePaidCents)}) serão preservados. O valor pendente será recalculado com base no novo total.</p>
+      </Card>}
 
       {formError && (
         <p className="flex items-center gap-2 rounded-xl bg-danger-50 px-3.5 py-2.5 text-sm text-danger-700">
@@ -422,6 +452,7 @@ export function SaleForm() {
       )}
 
       <div className="fixed inset-x-0 bottom-above-nav z-30 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur md:static md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+        {onCancel && <Button type="button" variant="ghost" className="mb-2 w-full" onClick={onCancel}>Cancelar edição</Button>}
         <Button
           size="lg"
           className="w-full"
@@ -429,7 +460,7 @@ export function SaleForm() {
           loading={submitting}
           disabled={items.length === 0 || (!avulso && !customerId)}
         >
-          Registrar venda · {formatCurrencyBRL(totalCents)}
+          {isEditing ? "Salvar alterações" : "Registrar venda"} · {formatCurrencyBRL(totalCents)}
         </Button>
       </div>
     </div>

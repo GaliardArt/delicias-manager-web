@@ -79,7 +79,7 @@ export default function EncomendasHistoricoPage() {
         <EmptyState
           icon={History}
           title="Nenhuma encomenda finalizada ainda"
-          description="Encomendas aparecem aqui quando o respectivo Dia de Venda é encerrado e elas são marcadas como entregues."
+          description="Encomendas aparecem aqui quando são marcadas como entregues ou quando o Dia de Venda é encerrado."
         />
       )}
 

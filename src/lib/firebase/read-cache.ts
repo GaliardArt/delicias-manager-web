@@ -37,6 +37,11 @@ export function primeReadCache<T>(key: string, value: T): void {
   values.set(scopedKey(key), value);
 }
 
+export function updateReadCache<T>(key: string, update: (current: T) => T): void {
+  const fullKey = scopedKey(key);
+  if (values.has(fullKey)) values.set(fullKey, update(values.get(fullKey) as T));
+}
+
 export interface FirestorePage<T, C> {
   items: T[];
   hasMore: boolean;

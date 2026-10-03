@@ -22,7 +22,7 @@ import { Payment, PaymentMethod, Sale, SaleItem } from "@/types";
 import { normalizeSaleItems } from "@/lib/utils/normalize-items";
 import { ensureOpenSalesDay } from "./sales-days";
 import { todayLocalIso } from "@/lib/utils/format";
-import { readThroughCache } from "./read-cache";
+import { readThroughCache, updateReadCache } from "./read-cache";
 
 function tsToIso(value: unknown): string {
   if (value instanceof Timestamp) return value.toDate().toISOString();
@@ -132,6 +132,128 @@ export interface SaleListItem {
   pendingCents: number;
   createdAt: string;
   itemsCount: number;
+}
+
+export interface UpdateSaleInput {
+  customerId: string;
+  customerName: string;
+  items: SaleItem[];
+  discountCents: number;
+  payments: Payment[];
+}
+
+function getSaleTotals(items: SaleItem[], discountCents: number) {
+  if (!items.length) throw new Error("A venda precisa ter ao menos um produto.");
+  if (!Number.isInteger(discountCents) || discountCents < 0) {
+    throw new Error("O desconto da venda é inválido.");
+  }
+  const normalizedItems = items.map((item) => ({
+    ...item,
+    totalCents: Math.round(item.unitPriceCents * item.quantity),
+  }));
+  const subtotalCents = normalizedItems.reduce((sum, item) => sum + item.totalCents, 0);
+  if (discountCents > subtotalCents) {
+    throw new Error("O desconto não pode ser maior que o subtotal da venda.");
+  }
+  return { normalizedItems, subtotalCents, totalCents: subtotalCents - discountCents };
+}
+
+function quantityByProduct(items: SaleItem[]): Map<string, number> {
+  const quantities = new Map<string, number>();
+  for (const item of items) {
+    quantities.set(item.productId, (quantities.get(item.productId) ?? 0) + item.quantity);
+  }
+  return quantities;
+}
+
+/** Edits sale details without changing its payment history or original date. */
+export async function updateSale(saleId: string, input: UpdateSaleInput): Promise<Sale> {
+  const { normalizedItems, subtotalCents, totalCents } = getSaleTotals(input.items, input.discountCents);
+  const saleRef = doc(db, "sales", saleId);
+  let updatedSale!: Sale;
+
+  await runTransaction(db, async (transaction) => {
+    const saleSnap = await transaction.get(saleRef);
+    if (!saleSnap.exists()) throw new Error("Venda não encontrada.");
+    const current = saleSnap.data();
+    const currentItems = normalizeSaleItems(current.items);
+    const paidCents = Number(current.paidCents ?? 0);
+    if (totalCents < paidCents) {
+      throw new Error("O total não pode ficar abaixo do valor já pago. Ajuste os itens ou o desconto.");
+    }
+
+    const oldQuantities = quantityByProduct(currentItems);
+    const newQuantities = quantityByProduct(normalizedItems);
+    const productIds = new Set([...oldQuantities.keys(), ...newQuantities.keys()]);
+    const productDeltas = Array.from(productIds)
+      .map((id) => ({ id, quantity: (oldQuantities.get(id) ?? 0) - (newQuantities.get(id) ?? 0) }))
+      .filter((entry) => entry.quantity !== 0);
+    const productRefs = productDeltas.map(({ id }) => doc(db, "products", id));
+    const dayRef = typeof current.salesDayId === "string" ? doc(db, "salesDays", current.salesDayId) : null;
+    const actualDaySnap = dayRef ? await transaction.get(dayRef) : null;
+    const actualProductSnaps = await Promise.all(productRefs.map((ref) => transaction.get(ref)));
+
+    productDeltas.forEach(({ id, quantity }, index) => {
+      const productSnap = actualProductSnaps[index];
+      if (quantity < 0 && !productSnap?.exists()) {
+        throw new Error("Um produto adicionado à venda não existe mais.");
+      }
+    });
+
+    transaction.update(saleRef, {
+      customerId: input.customerId,
+      customerName: input.customerName,
+      items: normalizedItems,
+      subtotalCents,
+      discountCents: input.discountCents,
+      totalCents,
+      pendingCents: totalCents - paidCents,
+    });
+    productDeltas.forEach(({ quantity }, index) => {
+      const productRef = productRefs[index];
+      if (productRef && actualProductSnaps[index]?.exists()) {
+        transaction.update(productRef, { stockQuantity: increment(quantity) });
+      }
+    });
+
+    if (actualDaySnap?.exists() && actualDaySnap.data().closed === true) {
+      const totalDelta = totalCents - Number(current.totalCents ?? 0);
+      const pendingDelta = totalCents - paidCents - Number(current.pendingCents ?? (Number(current.totalCents ?? 0) - paidCents));
+      transaction.update(dayRef!, {
+        expectedCents: increment(totalDelta),
+        pendingCents: increment(pendingDelta),
+        salesCents: increment(totalDelta),
+      });
+    }
+
+    updatedSale = {
+      id: saleSnap.id,
+      customerId: input.customerId,
+      customerName: input.customerName,
+      items: normalizedItems,
+      subtotalCents,
+      discountCents: input.discountCents,
+      totalCents,
+      paidCents,
+      pendingCents: totalCents - paidCents,
+      payments: input.payments,
+      salesDayId: current.salesDayId,
+      createdAt: tsToIso(current.createdAt),
+    };
+  });
+
+  updateReadCache<Sale>(`sales/${saleId}/detail`, (current) => ({ ...updatedSale, payments: current.payments }));
+  for (const key of ["sales/recent/100", "sales/history/150"]) {
+    updateReadCache<SaleListItem[]>(key, (sales) => sales.map((sale) => sale.id === saleId ? {
+      ...sale,
+      customerName: updatedSale.customerName,
+      totalCents: updatedSale.totalCents,
+      paidCents: updatedSale.paidCents,
+      pendingCents: updatedSale.pendingCents,
+      itemsCount: updatedSale.items.length,
+    } : sale));
+  }
+  return updatedSale;
 }
 
 function localDateKey(date: Date): string {

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { AlertCircle, ArrowLeft, FileText, MapPin, StickyNote, Trash2, XCircle } from "lucide-react";
+import { AlertCircle, ArrowLeft, Copy, FileText, MapPin, Pencil, StickyNote, Trash2, XCircle } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -18,6 +18,7 @@ import { buildOrderNoteData } from "@/lib/utils/simple-note";
 import { SimpleNoteModal } from "@/features/notes/components/SimpleNoteModal";
 import { paymentMethodLabel } from "@/lib/utils/payment-method";
 import { Badge } from "@/components/ui/Badge";
+import { OrderForm } from "@/features/orders/components/OrderForm";
 
 export default function OrderDetailPage() {
   const params = useParams<{ id: string }>();
@@ -27,6 +28,8 @@ export default function OrderDetailPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [copying, setCopying] = useState(false);
 
   async function load() {
     setError(false);
@@ -74,7 +77,27 @@ export default function OrderDetailPage() {
         <EmptyState icon={AlertCircle} title="Encomenda não encontrada" />
       )}
 
-      {order && (
+      {order && editing && (
+        <OrderForm
+          key={order.id}
+          initialOrder={order}
+          onSaved={(updated) => {
+            setOrder(updated);
+            setEditing(false);
+          }}
+          onCancel={() => setEditing(false)}
+        />
+      )}
+
+      {order && copying && (
+        <OrderForm
+          key={`${order.id}-copy`}
+          copyFrom={order}
+          onCancel={() => setCopying(false)}
+        />
+      )}
+
+      {order && !editing && !copying && (
         <div className="flex flex-col gap-4">
           <Card>
             <CardHeader>
@@ -144,6 +167,14 @@ export default function OrderDetailPage() {
             <Button variant="secondary" size="sm" onClick={() => setNoteOpen(true)}>
               <FileText className="h-4 w-4" /> Nota simples
             </Button>
+            <Button variant="secondary" size="sm" onClick={() => setCopying(true)}>
+              <Copy className="h-4 w-4" /> Duplicar encomenda
+            </Button>
+            {order.status !== "cancelada" && (
+              <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
+                <Pencil className="h-4 w-4" /> Editar encomenda
+              </Button>
+            )}
             {order.status !== "finalizada" && order.status !== "cancelada" && (
               <Button variant="danger" size="sm" onClick={() => setCancelConfirmOpen(true)}>
                 <XCircle className="h-4 w-4" /> Cancelar
@@ -163,7 +194,7 @@ export default function OrderDetailPage() {
                 ? "Finalizada = entregue. O pagamento é controlado separadamente."
                 : order.status === "cancelada"
                   ? "Cancelada — não realizada."
-                  : "Em produção — será finalizada quando o Dia de Venda for encerrado."}
+                  : "Em produção — você pode marcar como entregue sem encerrar o Dia de Venda. O fechamento do dia é uma ação separada."}
             </p>
           </Card>
 

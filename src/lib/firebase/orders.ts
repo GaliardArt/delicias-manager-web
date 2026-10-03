@@ -21,7 +21,7 @@ import { normalizeSaleItems } from "@/lib/utils/normalize-items";
 import { todayLocalIso } from "@/lib/utils/format";
 import { normalizeOrderStatus } from "@/lib/utils/order-status";
 import { ensureOpenSalesDay } from "./sales-days";
-import { readThroughCache } from "./read-cache";
+import { readThroughCache, updateReadCache } from "./read-cache";
 
 function tsToIso(value: unknown): string {
   if (value instanceof Timestamp) return value.toDate().toISOString();
@@ -165,6 +165,171 @@ export async function listRecentOrders(max = 150): Promise<OrderListItem[]> {
     };
   });
   });
+}
+
+export interface UpdateOrderInput {
+  customerId: string;
+  customerName: string;
+  items: SaleItem[];
+  expectedDate: string;
+  deliveryAddress?: string;
+  notes?: string;
+  payments: Payment[];
+}
+
+function quantitiesByProduct(items: SaleItem[]): Map<string, number> {
+  const quantities = new Map<string, number>();
+  for (const item of items) {
+    quantities.set(item.productId, (quantities.get(item.productId) ?? 0) + item.quantity);
+  }
+  return quantities;
+}
+
+/** Updates order details while preserving its payment history and original date. */
+export async function updateOrder(orderId: string, input: UpdateOrderInput): Promise<Order> {
+  if (!input.expectedDate) throw new Error("Informe a data prevista de entrega.");
+  if (!input.items.length) throw new Error("A encomenda precisa ter ao menos um produto.");
+  const items = input.items.map((item) => ({ ...item, totalCents: Math.round(item.unitPriceCents * item.quantity) }));
+  const totalCents = items.reduce((sum, item) => sum + item.totalCents, 0);
+  const orderRef = doc(db, "orders", orderId);
+  const orderSnap = await getDoc(orderRef);
+  if (!orderSnap.exists()) throw new Error("Encomenda não encontrada.");
+  const initialData = orderSnap.data();
+  if (normalizeOrderStatus(initialData.status) === "cancelada") {
+    throw new Error("Não é possível editar uma encomenda cancelada.");
+  }
+  if (totalCents < Number(initialData.paidCents ?? 0)) {
+    throw new Error("O total não pode ficar abaixo do valor já pago. Ajuste os itens.");
+  }
+  const targetSalesDayId = input.expectedDate !== initialData.expectedDate
+    ? await ensureOpenSalesDay(input.expectedDate)
+    : (typeof initialData.salesDayId === "string" ? initialData.salesDayId : undefined);
+  let updatedOrder!: Order;
+
+  await runTransaction(db, async (transaction) => {
+    const currentSnap = await transaction.get(orderRef);
+    if (!currentSnap.exists()) throw new Error("Encomenda não encontrada.");
+    const current = currentSnap.data();
+    const currentStatus = normalizeOrderStatus(current.status);
+    if (currentStatus === "cancelada") throw new Error("Não é possível editar uma encomenda cancelada.");
+    const currentItems = normalizeSaleItems(current.items);
+    const paidCents = Number(current.paidCents ?? 0);
+    if (totalCents < paidCents) {
+      throw new Error("O total não pode ficar abaixo do valor já pago. Ajuste os itens.");
+    }
+
+    const oldQuantities = quantitiesByProduct(currentItems);
+    const newQuantities = quantitiesByProduct(items);
+    const productIds = new Set([...oldQuantities.keys(), ...newQuantities.keys()]);
+    const productDeltas = Array.from(productIds)
+      .map((id) => ({ id, quantity: (oldQuantities.get(id) ?? 0) - (newQuantities.get(id) ?? 0) }))
+      .filter((entry) => entry.quantity !== 0);
+    const productRefs = productDeltas.map(({ id }) => doc(db, "products", id));
+    const oldDayRef = typeof current.salesDayId === "string" ? doc(db, "salesDays", current.salesDayId) : null;
+    const newDayRef = targetSalesDayId && targetSalesDayId !== current.salesDayId
+      ? doc(db, "salesDays", targetSalesDayId)
+      : null;
+    const dayRefs = [oldDayRef, newDayRef].filter((ref): ref is NonNullable<typeof ref> => ref !== null);
+    const daySnaps = await Promise.all(dayRefs.map((ref) => transaction.get(ref)));
+    const productSnaps = await Promise.all(productRefs.map((ref) => transaction.get(ref)));
+    productDeltas.forEach(({ quantity }, index) => {
+      if (quantity < 0 && (!productSnaps[index] || !productSnaps[index].exists())) {
+        throw new Error("Um produto adicionado à encomenda não existe mais.");
+      }
+    });
+    const oldDaySnap = oldDayRef ? daySnaps[dayRefs.indexOf(oldDayRef)] : undefined;
+    const newDaySnap = newDayRef ? daySnaps[dayRefs.indexOf(newDayRef)] : undefined;
+    if (newDaySnap?.exists() && newDaySnap.data().closed === true) {
+      throw new Error("A nova data já pertence a um Dia de Venda encerrado.");
+    }
+
+    transaction.update(orderRef, {
+      customerId: input.customerId,
+      customerName: input.customerName,
+      items,
+      totalCents,
+      pendingCents: totalCents - paidCents,
+      expectedDate: input.expectedDate,
+      salesDayId: targetSalesDayId ?? null,
+      deliveryAddress: input.deliveryAddress ?? "",
+      notes: input.notes ?? "",
+    });
+    productDeltas.forEach(({ quantity }, index) => {
+      const productRef = productRefs[index];
+      if (productRef && productSnaps[index]?.exists()) {
+        transaction.update(productRef, { stockQuantity: increment(quantity) });
+      }
+    });
+
+    if (oldDaySnap?.exists() && oldDaySnap.data().closed === true) {
+      const oldTotal = Number(current.totalCents ?? 0);
+      const oldPending = Number(current.pendingCents ?? (oldTotal - paidCents));
+      if (newDayRef) {
+        transaction.update(oldDayRef!, {
+          expectedCents: increment(-oldTotal),
+          receivedCents: increment(-paidCents),
+          pendingCents: increment(-oldPending),
+          ordersCount: increment(-1),
+          ...(currentStatus === "em_producao" ? { notRealizedCents: increment(-oldTotal) } : {}),
+        });
+      } else {
+        const totalDelta = totalCents - oldTotal;
+        transaction.update(oldDayRef!, {
+          expectedCents: increment(totalDelta),
+          pendingCents: increment(totalCents - paidCents - oldPending),
+          ...(currentStatus === "em_producao" ? { notRealizedCents: increment(totalDelta) } : {}),
+        });
+      }
+    }
+
+    updatedOrder = {
+      id: currentSnap.id,
+      customerId: input.customerId,
+      customerName: input.customerName,
+      items,
+      totalCents,
+      paidCents,
+      pendingCents: totalCents - paidCents,
+      payments: input.payments,
+      orderDate: current.orderDate,
+      expectedDate: input.expectedDate,
+      salesDayId: targetSalesDayId,
+      deliveryAddress: input.deliveryAddress ?? "",
+      notes: input.notes ?? "",
+      status: currentStatus,
+    };
+  });
+
+  updateReadCache<Order>(`orders/${orderId}/detail`, (current) => ({ ...updatedOrder, payments: current.payments }));
+  updateReadCache<OrderListItem[]>("orders/recent/150", (orders) => orders.map((order) => order.id === orderId ? {
+    ...order,
+    customerName: updatedOrder.customerName,
+    totalCents: updatedOrder.totalCents,
+    paidCents: updatedOrder.paidCents,
+    pendingCents: updatedOrder.pendingCents,
+    expectedDate: updatedOrder.expectedDate,
+    status: updatedOrder.status,
+    itemsCount: updatedOrder.items.length,
+    items: updatedOrder.items,
+  } : order).sort((a, b) => a.expectedDate.localeCompare(b.expectedDate)));
+  return updatedOrder;
+}
+
+/** Marks an order delivered; closing its sales day remains a separate action. */
+export async function markOrderDelivered(orderId: string): Promise<void> {
+  const orderRef = doc(db, "orders", orderId);
+  await runTransaction(db, async (transaction) => {
+    const orderSnap = await transaction.get(orderRef);
+    if (!orderSnap.exists()) throw new Error("Encomenda não encontrada.");
+    const status = normalizeOrderStatus(orderSnap.data().status);
+    if (status === "cancelada") throw new Error("Uma encomenda cancelada não pode ser marcada como entregue.");
+    if (status !== "finalizada") transaction.update(orderRef, { status: "finalizada" });
+  });
+
+  updateReadCache<OrderListItem[]>("orders/recent/150", (orders) => orders.map((order) =>
+    order.id === orderId ? { ...order, status: "finalizada" } : order
+  ));
+  updateReadCache<Order>(`orders/${orderId}/detail`, (order) => ({ ...order, status: "finalizada" }));
 }
 
 export async function getOrderWithPayments(orderId: string): Promise<Order | null> {

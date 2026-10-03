@@ -14,13 +14,23 @@ import { listActiveCustomers } from "@/lib/firebase/customers";
 import { listActiveProducts } from "@/lib/firebase/products";
 import { listActiveInsumos } from "@/lib/firebase/insumos";
 import { listActiveIngredientes } from "@/lib/firebase/ingredientes";
-import { createOrder } from "@/lib/firebase/orders";
+import { createOrder, updateOrder } from "@/lib/firebase/orders";
 import { getProductExtraCost, resolveProductCost, toInsumosMap, toIngredientesMap } from "@/lib/costing";
 import { formatCurrencyBRL, localIsoPlusDays } from "@/lib/utils/format";
 import { paymentMethodOptions } from "@/lib/utils/payment-method";
+import { Order } from "@/types";
 
-export function OrderForm() {
+interface OrderFormProps {
+  initialOrder?: Order;
+  copyFrom?: Order;
+  onSaved?: (order: Order) => void;
+  onCancel?: () => void;
+}
+
+export function OrderForm({ initialOrder, copyFrom, onSaved, onCancel }: OrderFormProps) {
   const router = useRouter();
+  const isEditing = Boolean(initialOrder);
+  const sourceOrder = initialOrder ?? copyFrom;
 
   const [customers, setCustomers] = useState<Customer[] | null>(null);
   const [products, setProducts] = useState<Product[] | null>(null);
@@ -28,17 +38,17 @@ export function OrderForm() {
   const [ingredientes, setIngredientes] = useState<Ingrediente[]>([]);
   const [loadError, setLoadError] = useState(false);
 
-  const [customerId, setCustomerId] = useState("");
-  const [items, setItems] = useState<SaleItem[]>([]);
-  const [expectedDate, setExpectedDate] = useState(localIsoPlusDays(3));
-  const [deliveryAddress, setDeliveryAddress] = useState("");
-  const [notes, setNotes] = useState("");
+  const [customerId, setCustomerId] = useState(sourceOrder?.customerId ?? "");
+  const [items, setItems] = useState<SaleItem[]>(sourceOrder?.items ?? []);
+  const [expectedDate, setExpectedDate] = useState(sourceOrder?.expectedDate ?? localIsoPlusDays(3));
+  const [deliveryAddress, setDeliveryAddress] = useState(sourceOrder?.deliveryAddress ?? "");
+  const [notes, setNotes] = useState(sourceOrder?.notes ?? "");
   const [pendingProductId, setPendingProductId] = useState("");
   const [pendingQuantity, setPendingQuantity] = useState(1);
   const [pendingPriceCents, setPendingPriceCents] = useState(0);
 
   const [method, setMethod] = useState<PaymentMethod>("pix");
-  const [paidCents, setPaidCents] = useState(0);
+  const [paidCents, setPaidCents] = useState(initialOrder?.paidCents ?? 0);
 
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -64,7 +74,10 @@ export function OrderForm() {
 
   const totalCents = items.reduce((sum, item) => sum + item.totalCents, 0);
   const pendingCents = totalCents - paidCents;
-  const selectedCustomer = customers?.find((c) => c.id === customerId);
+  const selectedCustomer = customers?.find((c) => c.id === customerId) ??
+    (sourceOrder && customerId === sourceOrder.customerId
+      ? ({ id: sourceOrder.customerId, name: sourceOrder.customerName } as Customer)
+      : undefined);
 
   function handleSelectCustomer(id: string) {
     setCustomerId(id);
@@ -127,24 +140,37 @@ export function OrderForm() {
       setFormError("Informe a data prevista de entrega.");
       return;
     }
-    if (paidCents > totalCents) {
+    if (!isEditing && paidCents > totalCents) {
       setFormError("O valor pago não pode ser maior que o total.");
       return;
     }
 
     setSubmitting(true);
     try {
-      const orderId = await createOrder({
-        customerId: selectedCustomer.id,
-        customerName: selectedCustomer.name,
-        items,
-        expectedDate,
-        deliveryAddress,
-        notes,
-        initialPaymentCents: paidCents,
-        initialPaymentMethod: method,
-      });
-      router.push(`/encomendas/${orderId}`);
+      if (initialOrder) {
+        const saved = await updateOrder(initialOrder.id, {
+          customerId: selectedCustomer.id,
+          customerName: selectedCustomer.name,
+          items,
+          expectedDate,
+          deliveryAddress,
+          notes,
+          payments: initialOrder.payments,
+        });
+        onSaved?.(saved);
+      } else {
+        const orderId = await createOrder({
+          customerId: selectedCustomer.id,
+          customerName: selectedCustomer.name,
+          items,
+          expectedDate,
+          deliveryAddress,
+          notes,
+          initialPaymentCents: paidCents,
+          initialPaymentMethod: method,
+        });
+        router.push(`/encomendas/${orderId}`);
+      }
     } catch (err) {
       console.error(err);
       setFormError(
@@ -177,7 +203,7 @@ export function OrderForm() {
     );
   }
 
-  if (customers.length === 0 || products.length === 0) {
+  if ((customers.length === 0 || products.length === 0) && !isEditing) {
     return (
       <EmptyState
         icon={Users}
@@ -204,6 +230,9 @@ export function OrderForm() {
         <div className="flex flex-col gap-3">
           <Select value={customerId} onChange={(e) => handleSelectCustomer(e.target.value)}>
             <option value="">Selecione um cliente</option>
+            {sourceOrder && !customers.some((c) => c.id === sourceOrder.customerId) && (
+              <option value={sourceOrder.customerId}>{sourceOrder.customerName} (inativo)</option>
+            )}
             {customers.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -217,9 +246,11 @@ export function OrderForm() {
             onChange={(e) => setExpectedDate(e.target.value)}
           />
           <p className="text-xs text-ink-muted">
-            A encomenda começa em <strong className="text-ink">Em produção</strong> e
-            só passa para <strong className="text-ink">Finalizada</strong> quando o
-            Dia de Venda for encerrado.
+            {isEditing
+              ? "A edição mantém o status atual e os pagamentos já registrados."
+              : copyFrom
+                ? "Cópia de uma encomenda existente. Os pagamentos e o status não são copiados; ajuste os dados para registrar uma nova encomenda."
+              : <>A encomenda começa em <strong className="text-ink">Em produção</strong>. Você poderá marcá-la como entregue e encerrar o Dia de Venda separadamente.</>}
           </p>
           <Input
             label="Endereço de entrega (opcional)"
@@ -308,7 +339,7 @@ export function OrderForm() {
         </div>
       </Card>
 
-      <Card>
+      {!isEditing ? <Card>
         <CardHeader>
           <CardTitle>Sinal / pagamento (opcional)</CardTitle>
         </CardHeader>
@@ -351,7 +382,10 @@ export function OrderForm() {
             </span>
           </div>
         </div>
-      </Card>
+      </Card> : <Card>
+        <CardHeader><CardTitle>Pagamentos existentes</CardTitle></CardHeader>
+        <p className="text-sm text-ink-muted">Os pagamentos registrados ({formatCurrencyBRL(paidCents)}) serão preservados. O valor pendente será recalculado com base no novo total.</p>
+      </Card>}
 
       {formError && (
         <p className="flex items-center gap-2 rounded-xl bg-danger-50 px-3.5 py-2.5 text-sm text-danger-700">
@@ -360,6 +394,7 @@ export function OrderForm() {
       )}
 
       <div className="fixed inset-x-0 bottom-above-nav z-30 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur md:static md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+        {onCancel && <Button type="button" variant="ghost" className="mb-2 w-full" onClick={onCancel}>Cancelar edição</Button>}
         <Button
           size="lg"
           className="w-full"
@@ -367,7 +402,7 @@ export function OrderForm() {
           loading={submitting}
           disabled={items.length === 0 || !customerId}
         >
-          Registrar encomenda · {formatCurrencyBRL(totalCents)}
+          {isEditing ? "Salvar alterações" : "Registrar encomenda"} · {formatCurrencyBRL(totalCents)}
         </Button>
       </div>
     </div>

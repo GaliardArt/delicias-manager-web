@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { AlertCircle, ArrowLeft, FileText, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, FileText, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -17,6 +17,7 @@ import { formatCurrencyBRL, formatDateTimeBR } from "@/lib/utils/format";
 import { paymentMethodLabel } from "@/lib/utils/payment-method";
 import { buildSaleNoteData } from "@/lib/utils/simple-note";
 import { SimpleNoteModal } from "@/features/notes/components/SimpleNoteModal";
+import { SaleForm } from "@/features/sales/components/SaleForm";
 
 export default function SaleDetailPage() {
   const params = useParams<{ id: string }>();
@@ -25,6 +26,7 @@ export default function SaleDetailPage() {
   const [error, setError] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   async function load() {
     setError(false);
@@ -74,7 +76,19 @@ export default function SaleDetailPage() {
         <EmptyState icon={AlertCircle} title="Venda não encontrada" />
       )}
 
-      {sale && (
+      {sale && editing && (
+        <SaleForm
+          key={sale.id}
+          initialSale={sale}
+          onSaved={(updated) => {
+            setSale(updated);
+            setEditing(false);
+          }}
+          onCancel={() => setEditing(false)}
+        />
+      )}
+
+      {sale && !editing && (
         <div className="flex flex-col gap-4">
           <Card>
             <CardHeader>
@@ -138,6 +152,9 @@ export default function SaleDetailPage() {
           </Card>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
+              <Pencil className="h-4 w-4" /> Editar venda
+            </Button>
             <Button variant="secondary" size="sm" onClick={() => setNoteOpen(true)}>
               <FileText className="h-4 w-4" /> Nota simples
             </Button>

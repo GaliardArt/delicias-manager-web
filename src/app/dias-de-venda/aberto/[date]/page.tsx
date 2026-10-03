@@ -112,10 +112,10 @@ export default function FecharDiaDeVendaPage() {
             </CardHeader>
             {orders.length > 0 ? (
               <p className="text-sm text-ink-muted">
-                Ao encerrar o Dia de Venda, todas as encomendas ativas desta data serão
-                marcadas como <strong>Finalizada</strong>, o que significa que foram
-                entregues. O pagamento continua separado: o que não foi recebido
-                permanece como pendente/fiado e pode ser quitado depois.
+                Marcar encomendas como entregues não encerra este dia. Use <strong>Fechar dia</strong>
+                para consolidar as vendas e encomendas desta data. As encomendas que ainda
+                estiverem em produção serão marcadas como entregues no fechamento. O pagamento
+                continua separado: valores não recebidos permanecem pendentes e podem ser quitados depois.
               </p>
             ) : (
               <p className="text-sm text-ink-muted">

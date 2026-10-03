@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, PackageSearch, Search, MessageCircle, History } from "lucide-react";
+import { Plus, PackageSearch, Search, MessageCircle, History, Check } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -14,6 +14,7 @@ import {
   listRecentOrders,
   isOrderCompleted,
   buildProductionWhatsAppText,
+  markOrderDelivered,
   OrderListItem,
 } from "@/lib/firebase/orders";
 import { formatCurrencyBRL, formatDateBR } from "@/lib/utils/format";
@@ -23,7 +24,6 @@ import { OrderStatus } from "@/types";
 const statusFilterOptions: (OrderStatus | "todas")[] = [
   "todas",
   "em_producao",
-  "finalizada",
   "cancelada",
 ];
 
@@ -32,6 +32,8 @@ export default function EncomendasPage() {
   const [error, setError] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "todas">("todas");
+  const [deliveringId, setDeliveringId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   async function load() {
     setError(false);
@@ -61,6 +63,22 @@ export default function EncomendasPage() {
     if (!active) return;
     const text = buildProductionWhatsAppText(active);
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+  }
+
+  async function handleMarkDelivered(orderId: string) {
+    setDeliveringId(orderId);
+    setActionError(null);
+    try {
+      await markOrderDelivered(orderId);
+      setOrders((current) => current?.map((order) => order.id === orderId
+        ? { ...order, status: "finalizada" }
+        : order) ?? null);
+    } catch (err) {
+      console.error(err);
+      setActionError(err instanceof Error ? err.message : "Não foi possível marcar como entregue.");
+    } finally {
+      setDeliveringId(null);
+    }
   }
 
   return (
@@ -109,6 +127,8 @@ export default function EncomendasPage() {
         </Link>
       </div>
 
+      {actionError && <p role="alert" className="mb-3 rounded-xl bg-danger-50 px-3.5 py-2.5 text-sm text-danger-700">{actionError}</p>}
+
       {orders === null && !error && (
         <div className="flex flex-col gap-3">
           {[...Array(4)].map((_, i) => (
@@ -154,26 +174,40 @@ export default function EncomendasPage() {
           <ul className="divide-y divide-line">
             {filtered.map((order) => (
               <li key={order.id}>
-                <Link
-                  href={`/encomendas/${order.id}`}
-                  className="flex items-center justify-between gap-3 px-4 py-3.5 transition-colors hover:bg-surface-muted"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-ink">{order.customerName}</p>
-                    <p className="text-xs text-ink-muted">
-                      Entrega {formatDateBR(order.expectedDate)} · {order.itemsCount}{" "}
-                      {order.itemsCount === 1 ? "item" : "itens"}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1">
-                    <span className="text-sm font-semibold text-ink">
-                      {formatCurrencyBRL(order.totalCents)}
-                    </span>
-                    <Badge tone={orderStatusTone[order.status]}>
-                      {orderStatusLabel[order.status]}
-                    </Badge>
-                  </div>
-                </Link>
+                <div className="flex items-center gap-2 px-3 py-3.5 sm:px-4">
+                  <Link
+                    href={`/encomendas/${order.id}`}
+                    className="flex min-w-0 flex-1 items-center justify-between gap-3 transition-colors hover:bg-surface-muted"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-ink">{order.customerName}</p>
+                      <p className="text-xs text-ink-muted">
+                        Entrega {formatDateBR(order.expectedDate)} · {order.itemsCount}{" "}
+                        {order.itemsCount === 1 ? "item" : "itens"}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <span className="text-sm font-semibold text-ink">
+                        {formatCurrencyBRL(order.totalCents)}
+                      </span>
+                      <Badge tone={orderStatusTone[order.status]}>
+                        {orderStatusLabel[order.status]}
+                      </Badge>
+                    </div>
+                  </Link>
+                  {order.status !== "cancelada" && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="shrink-0"
+                      loading={deliveringId === order.id}
+                      disabled={deliveringId !== null}
+                      onClick={() => handleMarkDelivered(order.id)}
+                    >
+                      <Check className="h-4 w-4" /> Entregue
+                    </Button>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
