@@ -3,14 +3,15 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { AlertCircle, ArrowLeft, Copy, FileText, MapPin, Pencil, StickyNote, Trash2, XCircle } from "lucide-react";
+import { AlertCircle, ArrowLeft, CalendarDays, Copy, FileText, MapPin, Pencil, StickyNote, Trash2, XCircle } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { AddOrderPaymentForm } from "@/features/orders/components/AddOrderPaymentForm";
-import { cancelOrder, deleteOrder, getOrderWithPayments } from "@/lib/firebase/orders";
+import { cancelOrder, deleteOrder, getOrderWithPayments, rescheduleOrder } from "@/lib/firebase/orders";
 import { Order } from "@/types";
 import { formatCurrencyBRL, formatDateBR, formatDateTimeBR } from "@/lib/utils/format";
 import { orderStatusLabel, orderStatusTone } from "@/lib/utils/order-status";
@@ -30,15 +31,37 @@ export default function OrderDetailPage() {
   const [noteOpen, setNoteOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [copying, setCopying] = useState(false);
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [rescheduling, setRescheduling] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [actionError, setActionError] = useState<string | null>(null);
 
   async function load() {
     setError(false);
     setOrder(undefined);
     try {
-      setOrder(await getOrderWithPayments(params.id));
+      const data = await getOrderWithPayments(params.id);
+      setOrder(data);
+      if (data) setRescheduleDate(data.expectedDate);
     } catch (err) {
       console.error(err);
       setError(true);
+    }
+  }
+
+  async function handleReschedule() {
+    if (!order || !rescheduleDate) return;
+    setActionError(null);
+    setRescheduling(true);
+    try {
+      const salesDayId = await rescheduleOrder(order.id, order.expectedDate, rescheduleDate);
+      setOrder({ ...order, expectedDate: rescheduleDate, salesDayId: salesDayId || order.salesDayId });
+      setRescheduleOpen(false);
+    } catch (err) {
+      console.error(err);
+      setActionError(err instanceof Error ? err.message : "Não foi possível redirecionar a encomenda.");
+    } finally {
+      setRescheduling(false);
     }
   }
 
@@ -175,6 +198,15 @@ export default function OrderDetailPage() {
                 <Pencil className="h-4 w-4" /> Editar encomenda
               </Button>
             )}
+            {order.status === "em_producao" && (
+              <Button variant="secondary" size="sm" onClick={() => {
+                setRescheduleDate(order.expectedDate);
+                setActionError(null);
+                setRescheduleOpen((open) => !open);
+              }}>
+                <CalendarDays className="h-4 w-4" /> Redirecionar data
+              </Button>
+            )}
             {order.status !== "finalizada" && order.status !== "cancelada" && (
               <Button variant="danger" size="sm" onClick={() => setCancelConfirmOpen(true)}>
                 <XCircle className="h-4 w-4" /> Cancelar
@@ -184,6 +216,29 @@ export default function OrderDetailPage() {
               <Trash2 className="h-4 w-4" /> Deletar encomenda
             </Button>
           </div>
+
+          {actionError && <p role="alert" className="rounded-xl bg-danger-50 px-3.5 py-2.5 text-sm text-danger-700">{actionError}</p>}
+
+          {rescheduleOpen && order.status === "em_producao" && (
+            <Card>
+              <CardHeader><CardTitle>Redirecionar encomenda</CardTitle></CardHeader>
+              <p className="mb-3 text-sm text-ink-muted">
+                Escolha outro Dia de Venda para a entrega. Produtos, status e pagamentos serão mantidos; o dia atual continuará aberto.
+              </p>
+              <Input
+                label="Nova data de entrega"
+                type="date"
+                value={rescheduleDate}
+                onChange={(event) => setRescheduleDate(event.target.value)}
+              />
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                <Button variant="ghost" disabled={rescheduling} onClick={() => setRescheduleOpen(false)}>Cancelar</Button>
+                <Button loading={rescheduling} disabled={!rescheduleDate || rescheduleDate === order.expectedDate} onClick={handleReschedule}>
+                  Redirecionar encomenda
+                </Button>
+              </div>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>

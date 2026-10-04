@@ -647,27 +647,36 @@ export default function RelatoriosPage() {
   }, [aging, expensesCents, inventory.noStockCount, previousExpensesCents, productPerformance, summary, trends.revenueChangePct]);
 
   const whatsappText = useMemo(() => {
+    const lastIncludedDate = new Date(period.end);
+    lastIncludedDate.setDate(lastIncludedDate.getDate() - 1);
+    const dateRange =
+      period.start.toLocaleDateString("pt-BR") + " a " +
+      lastIncludedDate.toLocaleDateString("pt-BR");
     const lines = [
       "📊 *Relatório gerencial*",
-      "📅 " + period.label,
+      "📅 " + period.label + " — " + dateRange,
       "",
-      "💰 Receita líquida: " + formatCurrencyBRL(summary.faturamentoLiquidoCents),
+      "💰 Faturamento bruto: " + formatCurrencyBRL(summary.faturamentoBrutoCents),
       "🏷️ Descontos: " + formatCurrencyBRL(summary.discountCents),
+      "💵 Receita líquida: " + formatCurrencyBRL(summary.faturamentoLiquidoCents),
+      "",
       "🧾 CMV: " + formatCurrencyBRL(summary.custoCents),
       "📈 Lucro bruto: " + formatCurrencyBRL(summary.lucroBrutoCents),
       "💸 Despesas: " + formatCurrencyBRL(expensesCents),
       "✅ Lucro líquido: " + formatCurrencyBRL(lucroLiquidoCents),
-      "⏳ Pendente nas vendas: " + formatCurrencyBRL(summary.pendenteCents),
       "",
-      "🛍️ " + summary.quantidadeVendas + " vendas",
+      "💳 Recebido das vendas: " + formatCurrencyBRL(summary.recebidoCents),
+      "⏳ A receber: " + formatCurrencyBRL(summary.pendenteCents),
+      "",
+      "🛍️ Vendas: " + summary.quantidadeVendas,
       "🎟️ Ticket médio: " + formatCurrencyBRL(summary.ticketMedioCents),
+      "📊 Margem bruta: " + pct(summary.margemBrutaPct),
+      "📈 Margem líquida: " + pct(margemLiquidaPct),
+      "",
+      "🥇 Produto mais vendido: " + (productsByQuantity[0]?.name ?? "Sem vendas no período"),
     ];
-
-    if (productsByQuantity[0]) {
-      lines.push("", "🥇 Mais vendido: " + productsByQuantity[0].name);
-    }
     return lines.join("\n");
-  }, [expensesCents, lucroLiquidoCents, period.label, productsByQuantity, summary]);
+  }, [expensesCents, lucroLiquidoCents, margemLiquidaPct, period, productsByQuantity, summary]);
 
   function handleShareWhatsApp() {
     window.open("https://wa.me/?text=" + encodeURIComponent(whatsappText), "_blank");

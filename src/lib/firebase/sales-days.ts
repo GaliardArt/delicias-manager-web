@@ -30,6 +30,58 @@ export function invalidateOpenDayGroupsCache(): void {
   openDayRequests.clear();
 }
 
+/** Keeps already loaded open-day screens consistent after an order is moved. */
+export function updateOpenDayOrderDateCache(
+  orderId: string,
+  expectedDate: string,
+  salesDayId: string
+): void {
+  for (const [key, cached] of openDayCache) {
+    const separator = key.indexOf(":");
+    const fromDate = separator >= 0 ? key.slice(separator + 1) : "all";
+    const existing = cached.orders.find((order) => order.id === orderId);
+    if (!existing) continue;
+
+    const movedOrder = { ...existing, expectedDate, salesDayId };
+    const includeInThisCache = fromDate === "all" || expectedDate >= fromDate;
+    const orders = cached.orders
+      .map((order) => order.id === orderId ? movedOrder : order)
+      .filter((order) => includeInThisCache || order.id !== orderId);
+
+    const groupsByDate = new Map<string, OpenDayGroup>();
+    for (const group of cached.groups) {
+      let groupOrders = group.orders.filter((order) => order.id !== orderId);
+      if (includeInThisCache && group.date === expectedDate && !groupOrders.some((order) => order.id === orderId)) {
+        groupOrders = [...groupOrders, movedOrder];
+      }
+      if (groupOrders.length > 0 || group.sales.length > 0) {
+        groupsByDate.set(group.date, {
+          ...group,
+          orders: groupOrders,
+          totalCents:
+            groupOrders.reduce((sum, order) => sum + order.totalCents, 0) +
+            group.sales.reduce((sum, sale) => sum + sale.totalCents, 0),
+        });
+      }
+    }
+
+    if (includeInThisCache && !groupsByDate.has(expectedDate)) {
+      groupsByDate.set(expectedDate, {
+        date: expectedDate,
+        orders: [movedOrder],
+        sales: [],
+        totalCents: movedOrder.totalCents,
+      });
+    }
+
+    openDayCache.set(key, {
+      ...cached,
+      orders,
+      groups: Array.from(groupsByDate.values()).sort((a, b) => a.date.localeCompare(b.date)),
+    });
+  }
+}
+
 function tsToIso(value: unknown): string {
   if (value instanceof Timestamp) return value.toDate().toISOString();
   return new Date().toISOString();

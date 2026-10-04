@@ -20,7 +20,7 @@ import { logActivity } from "./activity";
 import { normalizeSaleItems } from "@/lib/utils/normalize-items";
 import { todayLocalIso } from "@/lib/utils/format";
 import { normalizeOrderStatus } from "@/lib/utils/order-status";
-import { ensureOpenSalesDay } from "./sales-days";
+import { ensureOpenSalesDay, updateOpenDayOrderDateCache } from "./sales-days";
 import { readThroughCache, updateReadCache } from "./read-cache";
 
 function tsToIso(value: unknown): string {
@@ -313,6 +313,69 @@ export async function updateOrder(orderId: string, input: UpdateOrderInput): Pro
     items: updatedOrder.items,
   } : order).sort((a, b) => a.expectedDate.localeCompare(b.expectedDate)));
   return updatedOrder;
+}
+
+/** Moves an open order to another delivery date without changing its contents. */
+export async function rescheduleOrder(
+  orderId: string,
+  currentExpectedDate: string,
+  newExpectedDate: string
+): Promise<string> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(newExpectedDate)) {
+    throw new Error("Informe uma data válida para a entrega.");
+  }
+  if (newExpectedDate === currentExpectedDate) return "";
+
+  const newSalesDayId = await ensureOpenSalesDay(newExpectedDate);
+  const orderRef = doc(db, "orders", orderId);
+  await runTransaction(db, async (transaction) => {
+    const orderSnap = await transaction.get(orderRef);
+    if (!orderSnap.exists()) throw new Error("Encomenda não encontrada.");
+    const order = orderSnap.data();
+    if (order.expectedDate !== currentExpectedDate) {
+      throw new Error("A data desta encomenda foi alterada por outra operação. Atualize e tente novamente.");
+    }
+    if (normalizeOrderStatus(order.status) !== "em_producao") {
+      throw new Error("Somente encomendas em produção podem ser redirecionadas.");
+    }
+
+    const oldDayRef = typeof order.salesDayId === "string" ? doc(db, "salesDays", order.salesDayId) : null;
+    const newDayRef = doc(db, "salesDays", newSalesDayId);
+    const oldDaySnap = oldDayRef ? await transaction.get(oldDayRef) : null;
+    const newDaySnap = await transaction.get(newDayRef);
+    if (!newDaySnap.exists() || newDaySnap.data().closed === true) {
+      throw new Error("A nova data pertence a um Dia de Venda encerrado. Escolha outra data.");
+    }
+
+    transaction.update(orderRef, {
+      expectedDate: newExpectedDate,
+      salesDayId: newSalesDayId,
+    });
+
+    if (oldDayRef && oldDaySnap?.exists() && oldDaySnap.data().closed === true) {
+      const totalCents = Number(order.totalCents ?? 0);
+      const paidCents = Number(order.paidCents ?? 0);
+      const pendingCents = Number(order.pendingCents ?? (totalCents - paidCents));
+      transaction.update(oldDayRef, {
+        expectedCents: increment(-totalCents),
+        receivedCents: increment(-paidCents),
+        pendingCents: increment(-pendingCents),
+        ordersCount: increment(-1),
+        notRealizedCents: increment(-totalCents),
+      });
+    }
+  });
+
+  updateReadCache<Order>(`orders/${orderId}/detail`, (order) => ({
+    ...order,
+    expectedDate: newExpectedDate,
+    salesDayId: newSalesDayId,
+  }));
+  updateReadCache<OrderListItem[]>("orders/recent/150", (orders) => orders
+    .map((order) => order.id === orderId ? { ...order, expectedDate: newExpectedDate } : order)
+    .sort((a, b) => a.expectedDate.localeCompare(b.expectedDate)));
+  updateOpenDayOrderDateCache(orderId, newExpectedDate, newSalesDayId);
+  return newSalesDayId;
 }
 
 /** Marks an order delivered; closing its sales day remains a separate action. */
