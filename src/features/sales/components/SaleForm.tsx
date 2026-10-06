@@ -16,8 +16,9 @@ import { listActiveProducts } from "@/lib/firebase/products";
 import { listActiveInsumos } from "@/lib/firebase/insumos";
 import { listActiveIngredientes } from "@/lib/firebase/ingredientes";
 import { createSale, updateSale } from "@/lib/firebase/sales";
+import { createOrder } from "@/lib/firebase/orders";
 import { getProductExtraCost, resolveProductCost, toInsumosMap, toIngredientesMap } from "@/lib/costing";
-import { formatCurrencyBRL } from "@/lib/utils/format";
+import { formatCurrencyBRL, localIsoPlusDays } from "@/lib/utils/format";
 import { paymentMethodOptions } from "@/lib/utils/payment-method";
 import { Users } from "lucide-react";
 import { Sale } from "@/types";
@@ -25,14 +26,16 @@ import { Sale } from "@/types";
 type DiscountMode = "valor" | "percentual";
 
 interface SaleFormProps {
+  initialIsOrder?: boolean;
   initialSale?: Sale;
   onSaved?: (sale: Sale) => void;
   onCancel?: () => void;
 }
 
-export function SaleForm({ initialSale, onSaved, onCancel }: SaleFormProps) {
+export function SaleForm({ initialSale, initialIsOrder = false, onSaved, onCancel }: SaleFormProps) {
   const router = useRouter();
   const isEditing = Boolean(initialSale);
+  const [isOrder, setIsOrder] = useState(initialIsOrder);
 
   const [customers, setCustomers] = useState<Customer[] | null>(null);
   const [products, setProducts] = useState<Product[] | null>(null);
@@ -44,6 +47,7 @@ export function SaleForm({ initialSale, onSaved, onCancel }: SaleFormProps) {
   const [avulso, setAvulso] = useState(Boolean(initialSale && !initialSale.customerId));
   const [avulsoName, setAvulsoName] = useState(initialSale?.customerName ?? "");
   const [items, setItems] = useState<SaleItem[]>(initialSale?.items ?? []);
+  const [expectedDate, setExpectedDate] = useState(localIsoPlusDays(3));
 
   const [pendingProductId, setPendingProductId] = useState("");
   const [pendingQuantity, setPendingQuantity] = useState(1);
@@ -84,7 +88,7 @@ export function SaleForm({ initialSale, onSaved, onCancel }: SaleFormProps) {
     discountMode === "valor"
       ? discountValueCents
       : Math.round(subtotalCents * (discountPercent / 100));
-  const discountCents = Math.max(0, Math.round(rawDiscountCents));
+  const discountCents = isOrder && !isEditing ? 0 : Math.max(0, Math.round(rawDiscountCents));
   const totalCents = Math.max(0, subtotalCents - discountCents);
 
   useEffect(() => {
@@ -142,11 +146,23 @@ export function SaleForm({ initialSale, onSaved, onCancel }: SaleFormProps) {
       : undefined);
   const effectiveCustomerName = avulso ? avulsoName.trim() || "Cliente avulso" : selectedCustomer?.name;
 
+  function handleOrderToggle(enabled: boolean) {
+    setIsOrder(enabled);
+    if (enabled) {
+      setAvulso(false);
+      if (method === "fiado") setMethod("pix");
+    }
+  }
+
   async function handleSubmit() {
     setFormError(null);
 
-    if (!avulso && !selectedCustomer) {
+    if ((isOrder || !avulso) && !selectedCustomer) {
       setFormError("Selecione um cliente ou marque \"Avulso\".");
+      return;
+    }
+    if (isOrder && !expectedDate) {
+      setFormError("Informe a data prevista de entrega.");
       return;
     }
     if (items.length === 0) {
@@ -174,6 +190,18 @@ export function SaleForm({ initialSale, onSaved, onCancel }: SaleFormProps) {
         });
         onSaved?.(saved);
       } else {
+        if (isOrder) {
+          const orderId = await createOrder({
+            customerId: selectedCustomer!.id,
+            customerName: selectedCustomer!.name,
+            items,
+            expectedDate,
+            initialPaymentCents: paidCents,
+            initialPaymentMethod: method,
+          });
+          router.push(`/encomendas/${orderId}`);
+          return;
+        }
         const saleId = await createSale({
           customerId: avulso ? "" : selectedCustomer!.id,
           customerName: effectiveCustomerName!,
@@ -235,12 +263,27 @@ export function SaleForm({ initialSale, onSaved, onCancel }: SaleFormProps) {
           <CardTitle>Cliente</CardTitle>
         </CardHeader>
         <div className="flex flex-col gap-3">
-          <Checkbox
+          {!isEditing && <Checkbox
+            id="is-order"
+            label="É encomenda?"
+            checked={isOrder}
+            onChange={(e) => handleOrderToggle(e.target.checked)}
+          />}
+          {!isEditing && isOrder && (
+            <Input
+              label="Data de entrega"
+              type="date"
+              value={expectedDate}
+              onChange={(e) => setExpectedDate(e.target.value)}
+              required
+            />
+          )}
+          {!isOrder && <Checkbox
             id="avulso"
             label="Avulso (para clientes não cadastrados)"
             checked={avulso}
             onChange={(e) => setAvulso(e.target.checked)}
-          />
+          />}
           {avulso ? (
             <Input
               label="Nome (opcional)"
@@ -336,7 +379,7 @@ export function SaleForm({ initialSale, onSaved, onCancel }: SaleFormProps) {
         </div>
       </Card>
 
-      <Card>
+      {(!isOrder || isEditing) && <Card>
         <CardHeader>
           <CardTitle>Desconto</CardTitle>
         </CardHeader>
@@ -393,7 +436,7 @@ export function SaleForm({ initialSale, onSaved, onCancel }: SaleFormProps) {
             </div>
           </div>
         </div>
-      </Card>
+      </Card>}
 
       {!isEditing ? <Card>
         <CardHeader>
@@ -405,7 +448,7 @@ export function SaleForm({ initialSale, onSaved, onCancel }: SaleFormProps) {
             value={method}
             onChange={(e) => setMethod(e.target.value as PaymentMethod)}
           >
-            {paymentMethodOptions.map((opt) => (
+            {paymentMethodOptions.filter((opt) => !isOrder || opt.value !== "fiado").map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>
@@ -460,7 +503,7 @@ export function SaleForm({ initialSale, onSaved, onCancel }: SaleFormProps) {
           loading={submitting}
           disabled={items.length === 0 || (!avulso && !customerId)}
         >
-          {isEditing ? "Salvar alterações" : "Registrar venda"} · {formatCurrencyBRL(totalCents)}
+          {isEditing ? "Salvar alterações" : isOrder ? "Registrar encomenda" : "Registrar venda"} · {formatCurrencyBRL(totalCents)}
         </Button>
       </div>
     </div>

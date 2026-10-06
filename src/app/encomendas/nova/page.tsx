@@ -1,10 +1,10 @@
 import { AppShell } from "@/components/layout/AppShell";
-import { OrderForm } from "@/features/orders/components/OrderForm";
+import { SaleForm } from "@/features/sales/components/SaleForm";
 
 export default function NovaEncomendaPage() {
   return (
-    <AppShell title="Nova encomenda">
-      <OrderForm />
+    <AppShell title="Nova venda ou encomenda">
+      <SaleForm initialIsOrder />
     </AppShell>
   );
 }

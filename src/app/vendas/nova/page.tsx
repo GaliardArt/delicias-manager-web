@@ -3,7 +3,7 @@ import { SaleForm } from "@/features/sales/components/SaleForm";
 
 export default function NovaVendaPage() {
   return (
-    <AppShell title="Nova venda">
+    <AppShell title="Nova venda ou encomenda">
       <SaleForm />
     </AppShell>
   );

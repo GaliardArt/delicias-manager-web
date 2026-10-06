@@ -110,7 +110,7 @@ export default function EncomendasPage() {
           <Button variant="secondary" onClick={handleShareProduction} disabled={!active}>
             <MessageCircle className="h-4 w-4" /> Produção
           </Button>
-          <Link href="/encomendas/nova" className="w-full md:w-auto">
+          <Link href="/vendas/nova" className="w-full md:w-auto">
             <Button size="lg" className="w-full md:w-auto">
               <Plus className="h-4 w-4" /> Nova
             </Button>
@@ -164,7 +164,7 @@ export default function EncomendasPage() {
           onAction={
             search || statusFilter !== "todas"
               ? undefined
-              : () => (window.location.href = "/encomendas/nova")
+              : () => (window.location.href = "/vendas/nova")
           }
         />
       )}
