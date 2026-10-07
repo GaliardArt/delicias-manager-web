@@ -7,7 +7,7 @@ const hasRealConfig = Boolean(process.env.NEXT_PUBLIC_FIREBASE_API_KEY);
 if (!hasRealConfig && typeof window !== "undefined") {
   // eslint-disable-next-line no-console
   console.warn(
-    "[Delícias Manager] Variáveis do Firebase não configuradas. Copie .env.local.example para .env.local e preencha com as credenciais do seu projeto."
+    "[Joci Molina - Delicias Artesanais] Variáveis do Firebase não configuradas. Copie .env.local.example para .env.local e preencha com as credenciais do seu projeto."
   );
 }
 

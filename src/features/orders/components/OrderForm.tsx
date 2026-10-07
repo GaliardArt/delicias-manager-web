@@ -40,6 +40,7 @@ export function OrderForm({ initialOrder, copyFrom, onSaved, onCancel }: OrderFo
 
   const [customerId, setCustomerId] = useState(sourceOrder?.customerId ?? "");
   const [items, setItems] = useState<SaleItem[]>(sourceOrder?.items ?? []);
+  const [discountCents, setDiscountCents] = useState(sourceOrder?.discountCents ?? 0);
   const [expectedDate, setExpectedDate] = useState(sourceOrder?.expectedDate ?? localIsoPlusDays(3));
   const [deliveryAddress, setDeliveryAddress] = useState(sourceOrder?.deliveryAddress ?? "");
   const [notes, setNotes] = useState(sourceOrder?.notes ?? "");
@@ -72,7 +73,8 @@ export function OrderForm({ initialOrder, copyFrom, onSaved, onCancel }: OrderFo
       });
   }, []);
 
-  const totalCents = items.reduce((sum, item) => sum + item.totalCents, 0);
+  const subtotalCents = items.reduce((sum, item) => sum + item.totalCents, 0);
+  const totalCents = Math.max(0, subtotalCents - discountCents);
   const pendingCents = totalCents - paidCents;
   const selectedCustomer = customers?.find((c) => c.id === customerId) ??
     (sourceOrder && customerId === sourceOrder.customerId
@@ -136,6 +138,10 @@ export function OrderForm({ initialOrder, copyFrom, onSaved, onCancel }: OrderFo
       setFormError("Adicione ao menos um produto à encomenda.");
       return;
     }
+    if (!Number.isInteger(discountCents) || discountCents < 0 || discountCents > subtotalCents) {
+      setFormError("O desconto não pode ser maior que o subtotal.");
+      return;
+    }
     if (!expectedDate) {
       setFormError("Informe a data prevista de entrega.");
       return;
@@ -152,6 +158,7 @@ export function OrderForm({ initialOrder, copyFrom, onSaved, onCancel }: OrderFo
           customerId: selectedCustomer.id,
           customerName: selectedCustomer.name,
           items,
+          discountCents,
           expectedDate,
           deliveryAddress,
           notes,
@@ -163,6 +170,7 @@ export function OrderForm({ initialOrder, copyFrom, onSaved, onCancel }: OrderFo
           customerId: selectedCustomer.id,
           customerName: selectedCustomer.name,
           items,
+          discountCents,
           expectedDate,
           deliveryAddress,
           notes,
@@ -336,6 +344,25 @@ export function OrderForm({ initialOrder, copyFrom, onSaved, onCancel }: OrderFo
           >
             <Plus className="h-4 w-4" /> Adicionar
           </Button>
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Desconto</CardTitle></CardHeader>
+        <div className="flex flex-col gap-3">
+          <MoneyInput
+            label="Desconto (R$)"
+            valueCents={discountCents}
+            onValueCentsChange={setDiscountCents}
+          />
+          <div className="flex justify-between border-t border-line pt-3 text-sm">
+            <span className="text-ink-muted">Subtotal</span>
+            <span>{formatCurrencyBRL(subtotalCents)}</span>
+          </div>
+          <div className="flex justify-between text-sm font-semibold">
+            <span>Total com desconto</span>
+            <span>{formatCurrencyBRL(totalCents)}</span>
+          </div>
         </div>
       </Card>
 

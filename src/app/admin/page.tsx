@@ -304,7 +304,7 @@ export default function AdminPage() {
             <div>
               <h2 className="font-display text-lg font-semibold text-ink">Logins e permissões</h2>
               <p className="text-sm text-ink-muted">
-                O Firebase Authentication guarda o login. O Delícias Manager guarda somente o
+                O Firebase Authentication guarda o login. O sistema guarda somente o
                 perfil, cargo, foto e permissões.
               </p>
             </div>

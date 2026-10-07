@@ -130,6 +130,8 @@ function mapOrderDoc(id: string, data: DocumentData): Order {
     customerId: data.customerId,
     customerName: data.customerName,
     items: normalizeSaleItems(data.items),
+    subtotalCents: Number(data.subtotalCents ?? data.totalCents ?? 0),
+    discountCents: Number(data.discountCents ?? 0),
     totalCents: data.totalCents,
     paidCents: data.paidCents,
     pendingCents: data.pendingCents,

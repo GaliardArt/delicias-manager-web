@@ -61,8 +61,8 @@ export function buildOrderNoteData(order: Order): SimpleNoteData {
       unitPriceCents: item.unitPriceCents,
       totalCents: item.totalCents,
     })),
-    subtotalCents: order.totalCents,
-    discountCents: 0,
+    subtotalCents: order.subtotalCents ?? order.totalCents,
+    discountCents: order.discountCents ?? 0,
     totalCents: order.totalCents,
     paidCents: order.paidCents,
     pendingCents: order.pendingCents,
@@ -125,7 +125,7 @@ interface PdfLine {
 
 function buildPdfLines(data: SimpleNoteData): PdfLine[] {
   const lines: PdfLine[] = [
-    { text: "DELÍCIAS MANAGER", size: 18, bold: true },
+    { text: "JOCI MOLINA - DELICIAS ARTESANAIS", size: 15, bold: true },
     { text: "NOTA SIMPLES", size: 14, bold: true },
     { text: data.kindLabel, size: 10 },
     { text: "Nº: " + data.referenceId, size: 9 },

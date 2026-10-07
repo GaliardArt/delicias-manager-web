@@ -73,7 +73,7 @@ export default function OrderDetailPage() {
   return (
     <AppShell title="Detalhe da encomenda">
       <Link
-        href="/encomendas"
+        href="/vendas#encomendas"
         className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted hover:text-ink"
       >
         <ArrowLeft className="h-4 w-4" /> Voltar para Encomendas
@@ -165,6 +165,16 @@ export default function OrderDetailPage() {
             </ul>
 
             <div className="flex flex-col gap-1.5 border-t border-line pt-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-ink-muted">Subtotal</span>
+                <span>{formatCurrencyBRL(order.subtotalCents ?? order.totalCents + (order.discountCents ?? 0))}</span>
+              </div>
+              {(order.discountCents ?? 0) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-ink-muted">Desconto</span>
+                  <span className="font-semibold text-danger-700">- {formatCurrencyBRL(order.discountCents ?? 0)}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-ink-muted">Total</span>
                 <span className="font-semibold text-ink">
@@ -326,7 +336,7 @@ export default function OrderDetailPage() {
           danger
           onConfirm={async () => {
             await deleteOrder(order.id);
-            router.push("/encomendas");
+            router.push("/vendas#encomendas");
           }}
         />
       )}

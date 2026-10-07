@@ -192,7 +192,7 @@ export default function DashboardPage() {
             </ul>
           )}
           <Link
-            href="/encomendas"
+            href="/vendas#encomendas"
             className="mt-3 flex items-center gap-1 text-sm font-medium text-brand-600"
           >
             Ver todas as encomendas <ArrowRight className="h-3.5 w-3.5" />
@@ -226,14 +226,9 @@ export default function DashboardPage() {
 
       {/* Ações rápidas — mobile-first, ficam acessíveis com uma mão */}
       <div className="mt-5 grid grid-cols-2 gap-3 md:hidden">
-        <Link href="/vendas/nova" className="w-full">
+        <Link href="/vendas/nova" className="col-span-2 w-full">
           <Button size="lg" className="w-full">
-            <ShoppingCart className="h-4 w-4" /> Nova venda
-          </Button>
-        </Link>
-        <Link href="/encomendas/nova" className="w-full">
-          <Button variant="secondary" size="lg" className="w-full">
-            <PackagePlus className="h-4 w-4" /> Nova encomenda
+            <ShoppingCart className="h-4 w-4" /> Nova venda ou encomenda
           </Button>
         </Link>
       </div>

@@ -31,9 +31,12 @@ export function Sidebar({
 
   const visibleItems = !profile
     ? navItems.filter((item) => item.href === "/dashboard")
-    : navItems.filter((item) => {
+      : navItems.filter((item) => {
         if (item.href === "/perfil") return true;
         if (item.href === "/admin") return profile.role === "admin";
+        if (item.href === "/vendas") {
+          return profile.role === "admin" || profile.permissions.vendas?.view === true || profile.permissions.encomendas?.view === true;
+        }
         return profile.role === "admin" || profile.permissions[item.href.slice(1) as keyof typeof profile.permissions]?.view === true;
       });
 
@@ -49,8 +52,8 @@ export function Sidebar({
       <div className="mb-5 flex flex-col gap-3">
         <div className="flex items-center gap-2 px-2">
           <span className="text-xl">🍰</span>
-          <span className="font-display text-lg font-semibold text-ink">
-            Delícias Manager
+          <span className="font-display text-sm font-semibold leading-tight text-ink">
+            Joci Molina - Delicias Artesanais
           </span>
         </div>
 

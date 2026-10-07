@@ -88,7 +88,7 @@ export function SaleForm({ initialSale, initialIsOrder = false, onSaved, onCance
     discountMode === "valor"
       ? discountValueCents
       : Math.round(subtotalCents * (discountPercent / 100));
-  const discountCents = isOrder && !isEditing ? 0 : Math.max(0, Math.round(rawDiscountCents));
+  const discountCents = Math.max(0, Math.round(rawDiscountCents));
   const totalCents = Math.max(0, subtotalCents - discountCents);
 
   useEffect(() => {
@@ -195,6 +195,7 @@ export function SaleForm({ initialSale, initialIsOrder = false, onSaved, onCance
             customerId: selectedCustomer!.id,
             customerName: selectedCustomer!.name,
             items,
+            discountCents,
             expectedDate,
             initialPaymentCents: paidCents,
             initialPaymentMethod: method,
@@ -379,7 +380,7 @@ export function SaleForm({ initialSale, initialIsOrder = false, onSaved, onCance
         </div>
       </Card>
 
-      {(!isOrder || isEditing) && <Card>
+      <Card>
         <CardHeader>
           <CardTitle>Desconto</CardTitle>
         </CardHeader>
@@ -436,7 +437,7 @@ export function SaleForm({ initialSale, initialIsOrder = false, onSaved, onCance
             </div>
           </div>
         </div>
-      </Card>}
+      </Card>
 
       {!isEditing ? <Card>
         <CardHeader>

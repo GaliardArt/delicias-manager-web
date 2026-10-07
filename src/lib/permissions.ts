@@ -50,7 +50,7 @@ export const permissionCatalog: PermissionModuleConfig[] = [
   },
   {
     key: "encomendas",
-    label: "Encomendas",
+    label: "Encomendas (integradas em Vendas)",
     actions: [
       { key: "view", label: "Ver" },
       { key: "create", label: "Criar" },

@@ -14,7 +14,7 @@ const body = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Joci Molina - Delícias artesanais",
+  title: "Joci Molina - Delicias Artesanais",
   description: "Gestão de vendas, encomendas e clientes para o seu ateliê de doces.",
 };
 

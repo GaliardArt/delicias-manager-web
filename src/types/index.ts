@@ -147,6 +147,8 @@ export interface Order {
   customerId: string;
   customerName: string;
   items: SaleItem[];
+  subtotalCents?: number;
+  discountCents?: number;
   totalCents: number;
   paidCents: number;
   pendingCents: number;

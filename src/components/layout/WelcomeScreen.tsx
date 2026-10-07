@@ -24,8 +24,8 @@ export function WelcomeScreen({ name, fadingOut = false }: WelcomeScreenProps) {
         <div className="animate-welcome-copy">
           <div className="mb-2 flex items-center justify-center gap-2 text-brand-600">
             <Sparkles className="h-4 w-4" />
-            <span className="text-xs font-semibold uppercase tracking-[0.18em]">
-              Delícias Manager
+            <span className="text-xs font-semibold tracking-wide">
+              Joci Molina - Delicias Artesanais
             </span>
             <Sparkles className="h-4 w-4" />
           </div>

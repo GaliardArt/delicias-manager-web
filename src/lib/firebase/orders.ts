@@ -32,6 +32,7 @@ interface CreateOrderInput {
   customerId: string;
   customerName: string;
   items: SaleItem[];
+  discountCents?: number;
   expectedDate: string; // YYYY-MM-DD
   deliveryAddress?: string;
   notes?: string;
@@ -47,6 +48,7 @@ export async function createOrder(input: CreateOrderInput): Promise<string> {
     customerId,
     customerName,
     items,
+    discountCents = 0,
     expectedDate,
     deliveryAddress,
     notes,
@@ -62,7 +64,11 @@ export async function createOrder(input: CreateOrderInput): Promise<string> {
     ...item,
     totalCents: Math.round(item.unitPriceCents * item.quantity),
   }));
-  const totalCents = normalizedItems.reduce((sum, item) => sum + item.totalCents, 0);
+  const subtotalCents = normalizedItems.reduce((sum, item) => sum + item.totalCents, 0);
+  if (!Number.isInteger(discountCents) || discountCents < 0 || discountCents > subtotalCents) {
+    throw new Error("O desconto deve ser um valor válido e não pode superar o subtotal.");
+  }
+  const totalCents = subtotalCents - discountCents;
 
   if (initialPaymentCents > totalCents) {
     throw new Error("O valor pago não pode ser maior que o total da encomenda.");
@@ -79,6 +85,8 @@ export async function createOrder(input: CreateOrderInput): Promise<string> {
     customerId,
     customerName,
     items: normalizedItems,
+    subtotalCents,
+    discountCents,
     totalCents,
     paidCents: initialPaymentCents,
     pendingCents,
@@ -128,6 +136,8 @@ export interface OrderListItem {
   id: string;
   customerName: string;
   totalCents: number;
+  subtotalCents?: number;
+  discountCents?: number;
   paidCents: number;
   pendingCents: number;
   expectedDate: string;
@@ -156,6 +166,8 @@ export async function listRecentOrders(max = 150): Promise<OrderListItem[]> {
       id: d.id,
       customerName: data.customerName,
       totalCents: data.totalCents,
+      subtotalCents: Number(data.subtotalCents ?? data.totalCents ?? 0),
+      discountCents: Number(data.discountCents ?? 0),
       paidCents: data.paidCents,
       pendingCents: data.pendingCents,
       expectedDate: data.expectedDate,
@@ -171,6 +183,7 @@ export interface UpdateOrderInput {
   customerId: string;
   customerName: string;
   items: SaleItem[];
+  discountCents?: number;
   expectedDate: string;
   deliveryAddress?: string;
   notes?: string;
@@ -190,7 +203,12 @@ export async function updateOrder(orderId: string, input: UpdateOrderInput): Pro
   if (!input.expectedDate) throw new Error("Informe a data prevista de entrega.");
   if (!input.items.length) throw new Error("A encomenda precisa ter ao menos um produto.");
   const items = input.items.map((item) => ({ ...item, totalCents: Math.round(item.unitPriceCents * item.quantity) }));
-  const totalCents = items.reduce((sum, item) => sum + item.totalCents, 0);
+  const subtotalCents = items.reduce((sum, item) => sum + item.totalCents, 0);
+  const discountCents = input.discountCents ?? 0;
+  if (!Number.isInteger(discountCents) || discountCents < 0 || discountCents > subtotalCents) {
+    throw new Error("O desconto deve ser um valor válido e não pode superar o subtotal.");
+  }
+  const totalCents = subtotalCents - discountCents;
   const orderRef = doc(db, "orders", orderId);
   const orderSnap = await getDoc(orderRef);
   if (!orderSnap.exists()) throw new Error("Encomenda não encontrada.");
@@ -247,6 +265,8 @@ export async function updateOrder(orderId: string, input: UpdateOrderInput): Pro
       customerId: input.customerId,
       customerName: input.customerName,
       items,
+      subtotalCents,
+      discountCents,
       totalCents,
       pendingCents: totalCents - paidCents,
       expectedDate: input.expectedDate,
@@ -287,6 +307,8 @@ export async function updateOrder(orderId: string, input: UpdateOrderInput): Pro
       customerId: input.customerId,
       customerName: input.customerName,
       items,
+      subtotalCents,
+      discountCents,
       totalCents,
       paidCents,
       pendingCents: totalCents - paidCents,
@@ -305,6 +327,8 @@ export async function updateOrder(orderId: string, input: UpdateOrderInput): Pro
     ...order,
     customerName: updatedOrder.customerName,
     totalCents: updatedOrder.totalCents,
+    subtotalCents: updatedOrder.subtotalCents,
+    discountCents: updatedOrder.discountCents,
     paidCents: updatedOrder.paidCents,
     pendingCents: updatedOrder.pendingCents,
     expectedDate: updatedOrder.expectedDate,
@@ -420,6 +444,8 @@ export async function getOrderWithPayments(orderId: string): Promise<Order | nul
     customerId: data.customerId,
     customerName: data.customerName,
     items: normalizeSaleItems(data.items),
+    subtotalCents: Number(data.subtotalCents ?? (data.totalCents ?? 0)),
+    discountCents: Number(data.discountCents ?? 0),
     totalCents: data.totalCents,
     paidCents: data.paidCents,
     pendingCents: data.pendingCents,

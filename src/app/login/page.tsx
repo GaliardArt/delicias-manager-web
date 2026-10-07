@@ -85,7 +85,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-2 text-center">
           <span className="text-3xl">🍰</span>
-          <h1 className="font-display text-xl font-semibold text-ink">Delícias Manager</h1>
+          <h1 className="font-display text-xl font-semibold text-ink">Joci Molina - Delicias Artesanais</h1>
           <p className="text-sm text-ink-muted">Entre para gerenciar suas vendas e encomendas</p>
         </div>
 

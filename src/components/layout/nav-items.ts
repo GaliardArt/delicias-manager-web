@@ -1,7 +1,6 @@
 import {
   LayoutDashboard,
   ShoppingBag,
-  PackageSearch,
   CalendarDays,
   Users,
   Cookie,
@@ -27,9 +26,8 @@ export interface NavItem {
 export const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, primaryMobile: true },
   { href: "/vendas", label: "Vendas", icon: ShoppingBag, primaryMobile: true },
-  { href: "/encomendas", label: "Encomendas", icon: PackageSearch, primaryMobile: true },
   { href: "/clientes", label: "Clientes", icon: Users, primaryMobile: true },
-  { href: "/dias-de-venda", label: "Dias de Venda", icon: CalendarDays },
+  { href: "/dias-de-venda", label: "Dias de Venda", icon: CalendarDays, primaryMobile: true },
   { href: "/produtos", label: "Produtos", icon: Cookie },
   { href: "/insumos", label: "Insumos", icon: Wheat },
   { href: "/ingredientes", label: "Ingredientes", icon: Blend },

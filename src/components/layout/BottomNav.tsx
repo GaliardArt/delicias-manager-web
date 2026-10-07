@@ -10,7 +10,7 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 export function BottomNav() {
   const pathname = usePathname();
   const { profile, loading } = useUserProfile();
-  const items = navItems.filter((item) => item.primaryMobile && (loading || !profile || profile.role === "admin" || profile.permissions[item.href.slice(1) as keyof typeof profile.permissions]?.view === true));
+  const items = navItems.filter((item) => item.primaryMobile && (loading || !profile || profile.role === "admin" || (item.href === "/vendas" ? profile.permissions.vendas?.view === true || profile.permissions.encomendas?.view === true : profile.permissions[item.href.slice(1) as keyof typeof profile.permissions]?.view === true)));
   const isMoreActive = items.every((item) => !pathname.startsWith(item.href));
 
   return (
